@@ -23,13 +23,6 @@ const CAPACITY_OPTIONS = Array.from(
 const DEFAULT_DURATION_HOURS = 2;
 const LOCAL_PATTERN = "yyyy-MM-dd'T'HH:mm";
 
-// Default start: next full hour, minutes :00 (the most common case).
-function nextHour(): string {
-  const d = new Date();
-  d.setHours(d.getHours() + 1, 0, 0, 0);
-  return format(d, LOCAL_PATTERN);
-}
-
 function addHours(value: string, hours: number): string {
   if (!value) {
     return '';
@@ -50,10 +43,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
   const [type, setType] = useState<EventType>(EVENT_TYPE.MIXED);
   const [resourceId, setResourceId] = useState<ResourceId>(RESOURCE_IDS[0]);
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
-  const [startsAt, setStartsAt] = useState<string>(nextHour);
-  const [endsAt, setEndsAt] = useState<string>(() =>
-    addHours(startsAt, DEFAULT_DURATION_HOURS),
-  );
+  const [startsAt, setStartsAt] = useState<string>('');
+  const [endsAt, setEndsAt] = useState<string>('');
   // Once the user edits the end manually, stop auto-deriving it from the start.
   const [endEdited, setEndEdited] = useState<boolean>(false);
   const createEvent = useCreateEvent();
