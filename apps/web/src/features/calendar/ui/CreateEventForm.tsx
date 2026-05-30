@@ -63,6 +63,15 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
     setEndsAt(addHours(value, DEFAULT_DURATION_HOURS));
   };
 
+  // Confirming the prefilled start (without changing it) fires no change event,
+  // so fill the end on blur as well — but only when it's still empty.
+  const onStartBlur = (): void => {
+    if (startsAt && !endsAt) {
+      setStartTouched(true);
+      setEndsAt(addHours(startsAt, DEFAULT_DURATION_HOURS));
+    }
+  };
+
   const onEndChange = (value: string): void => {
     setEndsAt(value);
   };
@@ -134,6 +143,7 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
           type="datetime-local"
           value={startsAt}
           onChange={(e) => onStartChange(e.target.value)}
+          onBlur={onStartBlur}
         />
       </label>
 
