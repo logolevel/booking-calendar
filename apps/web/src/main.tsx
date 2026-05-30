@@ -2,9 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
+import { initTelegram } from './shared/telegram/theme';
+import './styles/global.css';
 
-window.Telegram?.WebApp.ready();
-window.Telegram?.WebApp.expand();
+initTelegram();
 
 const queryClient = new QueryClient();
 

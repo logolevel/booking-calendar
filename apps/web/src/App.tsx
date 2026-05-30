@@ -1,42 +1,73 @@
+import { ROLE, type Role } from '@tg-calendar/shared-types';
 import { useMe } from './features/auth/useMe';
 import { ApiError } from './shared/api/client';
 import { CalendarView } from './features/calendar/ui/CalendarView';
 
-const containerStyle: React.CSSProperties = {
-  fontFamily: 'system-ui, sans-serif',
-  color: 'var(--tg-theme-text-color, #000)',
-  background: 'var(--tg-theme-bg-color, #fff)',
-  minHeight: '100vh',
+const ROLE_LABELS: Record<Role, string> = {
+  [ROLE.ADMIN]: 'Адмін',
+  [ROLE.MEMBER]: 'Учасник',
+  [ROLE.EXTERNAL]: 'Гість',
 };
+
+function StateScreen({
+  icon,
+  title,
+  text,
+  loading = false,
+}: {
+  icon?: string;
+  title: string;
+  text?: string;
+  loading?: boolean;
+}): JSX.Element {
+  return (
+    <div className="state">
+      <div className="state__card">
+        {loading ? <div className="spinner" /> : <div className="state__icon">{icon}</div>}
+        <p className="state__title">{title}</p>
+        {text && <p className="state__text">{text}</p>}
+      </div>
+    </div>
+  );
+}
 
 export function App(): JSX.Element {
   const { data: me, isLoading, error } = useMe();
 
   if (isLoading) {
     return (
-      <main style={{ ...containerStyle, padding: 24 }}>
-        <p>Завантаження…</p>
-      </main>
+      <div className="app">
+        <StateScreen loading title="Завантаження…" />
+      </div>
     );
   }
 
-  if (error) {
+  if (error || !me) {
     const forbidden = error instanceof ApiError && error.status === 403;
     return (
-      <main style={{ ...containerStyle, padding: 24 }}>
-        <h1>TG Calendar</h1>
-        <p>
-          {forbidden
-            ? 'Доступ лише для учасників групи. Зверніться до адміністратора.'
-            : 'Не вдалося авторизуватися. Відкрийте застосунок через Telegram.'}
-        </p>
-      </main>
+      <div className="app">
+        <StateScreen
+          icon={forbidden ? '🔒' : '⚠️'}
+          title={forbidden ? 'Доступ обмежено' : 'Не вдалося авторизуватися'}
+          text={
+            forbidden
+              ? 'Календар доступний лише учасникам групи. Зверніться до адміністратора.'
+              : 'Відкрийте застосунок через Telegram.'
+          }
+        />
+      </div>
     );
   }
 
   return (
-    <main style={containerStyle}>
-      <CalendarView role={me?.role ?? 'external'} />
-    </main>
+    <div className="app">
+      <header className="app__header">
+        <span className="app__title">Календар</span>
+        <span className="chip chip--accent">{ROLE_LABELS[me.role]}</span>
+      </header>
+      <main className="app__main">
+        <CalendarView role={me.role} />
+      </main>
+    </div>
   );
 }

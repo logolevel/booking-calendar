@@ -7,10 +7,12 @@ import {
 } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { ROLE, type EventDto, type Role } from '@tg-calendar/shared-types';
+import { ROLE, type Role } from '@tg-calendar/shared-types';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { useEvents } from '../useEvents';
-import { eventTypeLabel } from '../eventLabels';
+import { toRbcEvent, type RbcEvent } from '../model/rbcEvent';
+import { Sheet } from '../../../shared/ui/Sheet';
+import { CalendarToolbar } from './CalendarToolbar';
 import { CreateEventForm } from './CreateEventForm';
 
 const localizer = dateFnsLocalizer({
@@ -21,20 +23,17 @@ const localizer = dateFnsLocalizer({
   locales: { uk },
 });
 
-interface RbcEvent {
-  title: string;
-  start: Date;
-  end: Date;
-  resourceId: number;
-}
+const RESOURCE_COLORS: Record<number, string> = {
+  1: 'var(--resource-1)',
+  2: 'var(--resource-2)',
+};
 
-function toRbcEvent(event: EventDto): RbcEvent {
-  return {
-    title: event.title ?? eventTypeLabel(event.type),
-    start: new Date(event.startsAt),
-    end: new Date(event.endsAt),
-    resourceId: event.resourceId,
-  };
+const calendarComponents = { toolbar: CalendarToolbar };
+
+function defaultView(): View {
+  return typeof window !== 'undefined' && window.innerWidth < 768
+    ? Views.AGENDA
+    : Views.WEEK;
 }
 
 interface Props {
@@ -43,7 +42,7 @@ interface Props {
 
 export function CalendarView({ role }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
-  const [view, setView] = useState<View>(Views.WEEK);
+  const [view, setView] = useState<View>(defaultView);
   const [date, setDate] = useState<Date>(new Date());
   const [showForm, setShowForm] = useState<boolean>(false);
 
@@ -55,50 +54,49 @@ export function CalendarView({ role }: Props): JSX.Element {
   );
 
   return (
-    <div style={{ padding: 12 }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 12,
-        }}
-      >
-        <h2 style={{ margin: 0 }}>Календар</h2>
-        {canCreate && (
-          <button type="button" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? 'Закрити' : '+ Подія'}
-          </button>
-        )}
-      </div>
+    <div className="calendar-wrap">
+      {isError && <p className="form__error">Не вдалося завантажити події.</p>}
+
+      <Calendar<RbcEvent>
+        localizer={localizer}
+        culture="uk"
+        events={events}
+        startAccessor="start"
+        endAccessor="end"
+        view={view}
+        onView={setView}
+        date={date}
+        onNavigate={setDate}
+        views={[Views.DAY, Views.WEEK, Views.AGENDA, Views.MONTH]}
+        components={calendarComponents}
+        min={new Date(1970, 0, 1, 8, 0, 0)}
+        max={new Date(1970, 0, 1, 23, 0, 0)}
+        popup
+        eventPropGetter={(event) => ({
+          style: {
+            backgroundColor: RESOURCE_COLORS[event.resourceId] ?? 'var(--accent)',
+          },
+        })}
+      />
+
+      {isLoading && <p className="state__text">Завантаження подій…</p>}
+
+      {canCreate && (
+        <button
+          type="button"
+          className="fab"
+          aria-label="Створити подію"
+          onClick={() => setShowForm(true)}
+        >
+          +
+        </button>
+      )}
 
       {showForm && canCreate && (
-        <CreateEventForm onClose={() => setShowForm(false)} />
+        <Sheet title="Нова подія" onClose={() => setShowForm(false)}>
+          <CreateEventForm onClose={() => setShowForm(false)} />
+        </Sheet>
       )}
-      {isError && <p>Не вдалося завантажити події.</p>}
-
-      <div style={{ height: '70vh' }}>
-        <Calendar<RbcEvent>
-          localizer={localizer}
-          culture="uk"
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          view={view}
-          onView={setView}
-          date={date}
-          onNavigate={setDate}
-          views={[Views.DAY, Views.WEEK, Views.AGENDA, Views.MONTH]}
-          min={new Date(1970, 0, 1, 8, 0, 0)}
-          max={new Date(1970, 0, 1, 23, 0, 0)}
-          eventPropGetter={(event) => ({
-            style: {
-              backgroundColor: event.resourceId === 1 ? '#2e7d32' : '#c62828',
-            },
-          })}
-        />
-      </div>
-      {isLoading && <p>Завантаження подій…</p>}
     </div>
   );
 }

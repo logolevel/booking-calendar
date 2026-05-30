@@ -10,6 +10,7 @@ import {
 } from '@tg-calendar/shared-types';
 import { useCreateEvent } from '../useEvents';
 import { eventTypeLabel } from '../eventLabels';
+import { Button } from '../../../shared/ui/Button';
 
 const EVENT_TYPES = Object.values(EVENT_TYPE);
 
@@ -42,17 +43,10 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
     );
   };
 
-  const fieldStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    marginBottom: 12,
-  };
-
   return (
-    <form onSubmit={submit} style={{ padding: 16 }}>
-      <label style={fieldStyle}>
-        Тип
+    <form onSubmit={submit}>
+      <label className="field">
+        <span className="field__label">Тип</span>
         <select
           value={type}
           onChange={(e) => setType(e.target.value as EventType)}
@@ -65,8 +59,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         </select>
       </label>
 
-      <label style={fieldStyle}>
-        Площадка
+      <label className="field">
+        <span className="field__label">Площадка</span>
         <select
           value={resourceId}
           onChange={(e) => setResourceId(Number(e.target.value) as ResourceId)}
@@ -79,8 +73,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         </select>
       </label>
 
-      <label style={fieldStyle}>
-        Ліміт учасників
+      <label className="field">
+        <span className="field__label">Ліміт учасників</span>
         <input
           type="number"
           min={MIN_CAPACITY}
@@ -90,8 +84,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         />
       </label>
 
-      <label style={fieldStyle}>
-        Початок
+      <label className="field">
+        <span className="field__label">Початок</span>
         <input
           type="datetime-local"
           value={startsAt}
@@ -99,8 +93,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         />
       </label>
 
-      <label style={fieldStyle}>
-        Кінець
+      <label className="field">
+        <span className="field__label">Кінець</span>
         <input
           type="datetime-local"
           value={endsAt}
@@ -109,18 +103,18 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
       </label>
 
       {createEvent.isError && (
-        <p style={{ color: 'crimson' }}>
+        <p className="form__error">
           Не вдалося створити подію (можливо, дата поза дозволеним діапазоном).
         </p>
       )}
 
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="submit" disabled={createEvent.isPending}>
-          Зберегти
-        </button>
-        <button type="button" onClick={onClose}>
+      <div className="form__actions">
+        <Button variant="secondary" block onClick={onClose}>
           Скасувати
-        </button>
+        </Button>
+        <Button type="submit" block disabled={createEvent.isPending}>
+          Зберегти
+        </Button>
       </div>
     </form>
   );
