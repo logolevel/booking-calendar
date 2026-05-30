@@ -19,12 +19,27 @@ const CAPACITY_OPTIONS = Array.from(
   (_, i) => MIN_CAPACITY + i,
 );
 
-// Default datetime-local value: next full hour, minutes :00 (most common case).
-// The user can still pick any minute afterwards.
-function nextHour(offsetHours = 0): string {
+// Typical training length; the end time is suggested as start + this.
+const DEFAULT_DURATION_HOURS = 2;
+const LOCAL_PATTERN = "yyyy-MM-dd'T'HH:mm";
+
+// Default start: next full hour, minutes :00 (the most common case).
+function nextHour(): string {
   const d = new Date();
-  d.setHours(d.getHours() + 1 + offsetHours, 0, 0, 0);
-  return format(d, "yyyy-MM-dd'T'HH:mm");
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  return format(d, LOCAL_PATTERN);
+}
+
+function addHours(value: string, hours: number): string {
+  if (!value) {
+    return '';
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    return '';
+  }
+  d.setHours(d.getHours() + hours);
+  return format(d, LOCAL_PATTERN);
 }
 
 interface Props {
@@ -35,9 +50,25 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
   const [type, setType] = useState<EventType>(EVENT_TYPE.MIXED);
   const [resourceId, setResourceId] = useState<ResourceId>(RESOURCE_IDS[0]);
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
-  const [startsAt, setStartsAt] = useState<string>(() => nextHour());
-  const [endsAt, setEndsAt] = useState<string>(() => nextHour(1));
+  const [startsAt, setStartsAt] = useState<string>(nextHour);
+  const [endsAt, setEndsAt] = useState<string>(() =>
+    addHours(startsAt, DEFAULT_DURATION_HOURS),
+  );
+  // Once the user edits the end manually, stop auto-deriving it from the start.
+  const [endEdited, setEndEdited] = useState<boolean>(false);
   const createEvent = useCreateEvent();
+
+  const onStartChange = (value: string): void => {
+    setStartsAt(value);
+    if (!endEdited) {
+      setEndsAt(addHours(value, DEFAULT_DURATION_HOURS));
+    }
+  };
+
+  const onEndChange = (value: string): void => {
+    setEndsAt(value);
+    setEndEdited(true);
+  };
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
@@ -105,7 +136,7 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <input
           type="datetime-local"
           value={startsAt}
-          onChange={(e) => setStartsAt(e.target.value)}
+          onChange={(e) => onStartChange(e.target.value)}
         />
       </label>
 
@@ -114,7 +145,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <input
           type="datetime-local"
           value={endsAt}
-          onChange={(e) => setEndsAt(e.target.value)}
+          disabled={!startsAt}
+          onChange={(e) => onEndChange(e.target.value)}
         />
       </label>
 

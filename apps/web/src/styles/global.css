@@ -424,6 +424,12 @@ button {
   border-color: var(--accent);
 }
 
+.field input:disabled,
+.field select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .form__error {
   color: var(--destructive);
   font-size: 13px;
