@@ -10,9 +10,12 @@ import {
   parse,
   startOfWeek,
   getDay,
+  startOfDay,
   addDays,
   addWeeks,
   addMonths,
+  isBefore,
+  isAfter,
 } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { ROLE, type EventDto, type Role } from '@tg-calendar/shared-types';
@@ -61,9 +64,10 @@ function shiftDate(date: Date, view: View, direction: 1 | -1): Date {
 
 interface Props {
   role: Role;
+  maxDaysAhead: number;
 }
 
-export function CalendarView({ role }: Props): JSX.Element {
+export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
   const [view, setView] = useState<View>(Views.WEEK);
   const [date, setDate] = useState<Date>(new Date());
@@ -72,6 +76,20 @@ export function CalendarView({ role }: Props): JSX.Element {
   const [mode, setMode] = useState<'details' | 'edit' | 'create'>('create');
 
   const canCreate = role === ROLE.ADMIN || role === ROLE.MEMBER;
+  const isAdmin = role === ROLE.ADMIN;
+
+  // Regular users can only book within [today, today + maxDaysAhead].
+  const dayPropGetter = (day: Date): { className?: string } => {
+    if (isAdmin) {
+      return {};
+    }
+    const today = startOfDay(new Date());
+    const maxDate = startOfDay(addDays(today, maxDaysAhead));
+    if (isBefore(day, today) || isAfter(startOfDay(day), maxDate)) {
+      return { className: 'rbc-day-off' };
+    }
+    return {};
+  };
 
   const openCreate = (): void => {
     setActiveEvent(null);
@@ -149,6 +167,7 @@ export function CalendarView({ role }: Props): JSX.Element {
         onSelectEvent={openDetails}
         views={[Views.DAY, Views.WEEK, Views.AGENDA, Views.MONTH]}
         components={calendarComponents}
+        dayPropGetter={dayPropGetter}
         min={new Date(1970, 0, 1, 8, 0, 0)}
         max={new Date(1970, 0, 1, 23, 0, 0)}
         popup

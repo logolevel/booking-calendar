@@ -99,7 +99,7 @@ export function App(): JSX.Element {
             </button>
           </div>
         )}
-        <CalendarView role={me.role} />
+        <CalendarView role={me.role} maxDaysAhead={me.maxDaysAhead} />
       </main>
     </div>
   );

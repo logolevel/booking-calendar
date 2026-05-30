@@ -414,7 +414,8 @@ button {
 .field select {
   width: 100%;
   font-family: inherit;
-  font-size: 15px;
+  /* 16px keeps iOS Safari from zooming the page on focus. */
+  font-size: 16px;
   color: var(--text);
   background: var(--secondary-bg);
   border: 1px solid transparent;
@@ -433,6 +434,12 @@ button {
 .field select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Days a regular user cannot book (past or beyond the limit) are dimmed. */
+.rbc-day-off,
+.rbc-day-off.rbc-day-bg {
+  background-color: rgba(128, 128, 128, 0.16);
 }
 
 .form__error {
@@ -608,7 +615,8 @@ button {
 .participants__search {
   width: 100%;
   font-family: inherit;
-  font-size: 15px;
+  /* 16px keeps iOS Safari from zooming the page on focus. */
+  font-size: 16px;
   color: var(--text);
   background: var(--secondary-bg);
   border: 1px solid transparent;

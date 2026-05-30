@@ -7,16 +7,31 @@ interface Props {
   me: MeResponse;
 }
 
+// Cyrillic letters plus apostrophe/hyphen/space (Ukrainian names).
+const UKRAINIAN = /^[\u0400-\u04FF'’ʼ\- ]+$/;
+
+function isUkrainian(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && UKRAINIAN.test(trimmed);
+}
+
+// Prefill from Telegram only when the value is already in Ukrainian.
+function prefill(value?: string): string {
+  return value && isUkrainian(value) ? value : '';
+}
+
 export function OnboardingForm({ me }: Props): JSX.Element {
-  const [lastName, setLastName] = useState(me.lastName ?? '');
-  const [firstName, setFirstName] = useState(me.firstName ?? '');
+  const [lastName, setLastName] = useState(() => prefill(me.lastName));
+  const [firstName, setFirstName] = useState(() => prefill(me.firstName));
   const [gender, setGender] = useState<Gender | null>(me.gender);
   const mutation = useOnboarding();
 
-  const canSubmit =
-    lastName.trim().length > 0 &&
-    firstName.trim().length > 0 &&
-    gender !== null;
+  const lastNameValid = isUkrainian(lastName);
+  const firstNameValid = isUkrainian(firstName);
+  const showLangError =
+    (lastName.trim().length > 0 && !lastNameValid) ||
+    (firstName.trim().length > 0 && !firstNameValid);
+  const canSubmit = lastNameValid && firstNameValid && gender !== null;
 
   const submit = (): void => {
     if (!canSubmit || gender === null) {
@@ -34,8 +49,8 @@ export function OnboardingForm({ me }: Props): JSX.Element {
       <div className="onboarding__card">
         <h1 className="onboarding__title">Вітаємо! 👋</h1>
         <p className="onboarding__subtitle">
-          Заповніть профіль, щоб користуватися календарем. Змінити ім'я згодом
-          можна лише через адміністратора.
+          Заповніть профіль українською мовою. Усі поля обов'язкові. Змінити
+          ім'я згодом можна лише через адміністратора.
         </p>
 
         <label className="field">
@@ -47,7 +62,6 @@ export function OnboardingForm({ me }: Props): JSX.Element {
               setLastName(e.target.value);
               mutation.reset();
             }}
-            placeholder="Завірюха"
           />
         </label>
 
@@ -60,9 +74,14 @@ export function OnboardingForm({ me }: Props): JSX.Element {
               setFirstName(e.target.value);
               mutation.reset();
             }}
-            placeholder="Данило"
           />
         </label>
+
+        {showLangError && (
+          <p className="form__error">
+            Ім'я та прізвище мають бути українською мовою.
+          </p>
+        )}
 
         <div className="field">
           <span className="field__label">Стать</span>
