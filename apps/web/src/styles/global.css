@@ -112,6 +112,57 @@ button {
   color: var(--accent);
 }
 
+/* Admin role preview switch */
+.role-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.role-switch::after {
+  content: '▾';
+  position: absolute;
+  right: 11px;
+  font-size: 10px;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.role-switch__select {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 26px 7px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.role-switch__select:focus {
+  outline: none;
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.preview-bar .btn {
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* Buttons                                                             */
 /* ------------------------------------------------------------------ */

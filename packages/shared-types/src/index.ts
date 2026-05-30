@@ -41,12 +41,18 @@ export interface HealthResponse {
 
 export interface MeResponse {
   id: number;
+  // Effective role (may be a previewed role when the real user is an admin).
   role: Role;
+  // True when the real authenticated user is an admin, regardless of preview.
+  isAdmin: boolean;
   firstName: string;
   lastName?: string;
   username?: string;
   maxDaysAhead: number;
 }
+
+// Header used by an admin to preview the app as another role.
+export const PREVIEW_ROLE_HEADER = 'x-preview-role';
 
 export interface EventDto {
   id: string;

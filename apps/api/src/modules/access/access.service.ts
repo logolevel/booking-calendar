@@ -48,6 +48,22 @@ export class AccessService {
     return null;
   }
 
+  // Apply a previewed role, but only when the real user is an admin.
+  // This prevents non-admins from escalating via the preview header.
+  applyPreview(realRole: Role | null, preview?: string | null): Role | null {
+    if (realRole !== Role.admin || !preview) {
+      return realRole;
+    }
+    if (
+      preview === Role.admin ||
+      preview === Role.member ||
+      preview === Role.external
+    ) {
+      return preview;
+    }
+    return realRole;
+  }
+
   async syncUser(user: VerifiedTelegramUser, role: Role): Promise<void> {
     await this.prisma.user.upsert({
       where: { id: BigInt(user.id) },

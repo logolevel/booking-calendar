@@ -3,11 +3,12 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Headers,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import type { EventDto } from '@tg-calendar/shared-types';
+import { PREVIEW_ROLE_HEADER, type EventDto } from '@tg-calendar/shared-types';
 import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
@@ -58,8 +59,11 @@ export class EventsController {
   async create(
     @CurrentUser() user: VerifiedTelegramUser,
     @Body() dto: CreateEventDto,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
   ): Promise<EventDto> {
-    const role = await this.requireAccess(user.id);
+    const realRole = await this.requireAccess(user.id);
+    // Admins previewing a non-admin role are subject to that role's limits.
+    const role = this.access.applyPreview(realRole, preview) ?? realRole;
     return this.events.create(user.id, role, dto);
   }
 

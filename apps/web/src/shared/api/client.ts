@@ -1,3 +1,6 @@
+import { PREVIEW_ROLE_HEADER } from '@tg-calendar/shared-types';
+import { getPreviewRole } from './preview';
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -17,11 +20,13 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
+  const preview = getPreviewRole();
   const res = await fetch(path, {
     method,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `tma ${getInitData()}`,
+      ...(preview ? { [PREVIEW_ROLE_HEADER]: preview } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

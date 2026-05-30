@@ -1,5 +1,7 @@
 import { ROLE, type Role } from '@tg-calendar/shared-types';
 import { useMe } from './features/auth/useMe';
+import { usePreviewRole } from './features/auth/usePreviewRole';
+import { RoleSwitch } from './features/auth/ui/RoleSwitch';
 import { ApiError } from './shared/api/client';
 import { CalendarView } from './features/calendar/ui/CalendarView';
 
@@ -33,6 +35,7 @@ function StateScreen({
 
 export function App(): JSX.Element {
   const { data: me, isLoading, error } = useMe();
+  const { preview, setPreview } = usePreviewRole();
 
   if (isLoading) {
     return (
@@ -59,13 +62,34 @@ export function App(): JSX.Element {
     );
   }
 
+  const isPreviewing = me.isAdmin && me.role !== ROLE.ADMIN;
+
   return (
     <div className="app">
       <header className="app__header">
         <span className="app__title">Календар</span>
-        <span className="chip chip--accent">{ROLE_LABELS[me.role]}</span>
+        {me.isAdmin ? (
+          <RoleSwitch
+            value={preview ?? ROLE.ADMIN}
+            onChange={(role) => setPreview(role === ROLE.ADMIN ? null : role)}
+          />
+        ) : (
+          <span className="chip chip--accent">{ROLE_LABELS[me.role]}</span>
+        )}
       </header>
       <main className="app__main">
+        {isPreviewing && (
+          <div className="preview-bar">
+            <span>👁 Перегляд як «{ROLE_LABELS[me.role]}»</span>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setPreview(null)}
+            >
+              Скинути
+            </button>
+          </div>
+        )}
         <CalendarView role={me.role} />
       </main>
     </div>
