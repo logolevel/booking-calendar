@@ -563,6 +563,23 @@ button {
   color: var(--button-text);
 }
 
+/* Give the time-view header room so the two-line day header isn't clipped */
+.rbc-time-header,
+.rbc-time-header-content,
+.rbc-time-header .rbc-row {
+  overflow: visible;
+}
+
+.rbc-time-header .rbc-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 58px;
+  overflow: visible;
+  white-space: normal;
+}
+
 .rbc-time-gutter,
 .rbc-timeslot-group .rbc-label,
 .rbc-label {
