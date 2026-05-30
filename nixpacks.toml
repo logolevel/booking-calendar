@@ -1,0 +1,12 @@
+# Force install of devDependencies (nest, vite, tsc) even when NODE_ENV=production,
+# otherwise the build tools are pruned and the build fails.
+[phases.install]
+cmds = ["pnpm install --frozen-lockfile --prod=false"]
+
+[phases.build]
+cmds = [
+  "pnpm --filter @tg-calendar/api prisma generate",
+  "pnpm --filter @tg-calendar/shared-types build",
+  "pnpm --filter @tg-calendar/web build",
+  "pnpm --filter @tg-calendar/api build"
+]
