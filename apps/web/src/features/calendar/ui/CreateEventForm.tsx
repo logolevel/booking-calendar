@@ -157,7 +157,11 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <Button variant="secondary" block onClick={onClose}>
           Скасувати
         </Button>
-        <Button type="submit" block disabled={createEvent.isPending}>
+        <Button
+          type="submit"
+          block
+          disabled={createEvent.isPending || !startsAt || !endsAt}
+        >
           Зберегти
         </Button>
       </div>
