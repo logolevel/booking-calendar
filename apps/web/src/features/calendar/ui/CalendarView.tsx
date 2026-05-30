@@ -37,6 +37,15 @@ import { ParticipantsPanel } from '../../participation/ui/ParticipantsPanel';
 
 const THREE_DAY_VIEW = 'three_day';
 
+// Phones get the compact 3-day view by default; wider screens get the week.
+const MOBILE_MAX_WIDTH = 768;
+
+function getDefaultView(): View {
+  const isMobile =
+    typeof window !== 'undefined' && window.innerWidth <= MOBILE_MAX_WIDTH;
+  return (isMobile ? THREE_DAY_VIEW : Views.WEEK) as View;
+}
+
 const localizer = dateFnsLocalizer({
   format,
   parse,
@@ -93,7 +102,7 @@ interface Props {
 
 export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
-  const [view, setView] = useState<View>(Views.WEEK);
+  const [view, setView] = useState<View>(getDefaultView);
   const [date, setDate] = useState<Date>(new Date());
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [activeEvent, setActiveEvent] = useState<EventDto | null>(null);
