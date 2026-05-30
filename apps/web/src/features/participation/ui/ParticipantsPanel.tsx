@@ -12,6 +12,7 @@ import {
   useParticipationActions,
   useUserSearch,
 } from '../useParticipation';
+import { useEventRealtime } from '../useEventRealtime';
 
 const RESOURCE_COLOR: Record<number, string> = {
   1: 'var(--resource-1)',
@@ -41,6 +42,7 @@ interface Props {
 }
 
 export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
+  useEventRealtime(event.id);
   const { data, isLoading } = useEventParticipants(event.id);
   const actions = useParticipationActions(event.id);
   const [query, setQuery] = useState('');

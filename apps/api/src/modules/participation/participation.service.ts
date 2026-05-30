@@ -13,6 +13,7 @@ import {
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -21,7 +22,25 @@ export class ParticipationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly telegram: TelegramService,
   ) {}
+
+  // Human-readable event label for push notifications (court time zone).
+  private async eventLabel(eventId: string): Promise<string> {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      return 'тренування';
+    }
+    const when = new Intl.DateTimeFormat('uk-UA', {
+      timeZone: 'Europe/Kyiv',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(event.startsAt);
+    const name = event.title ?? 'тренування';
+    return `${name} (${when}, площадка №${event.resourceId})`;
+  }
 
   // Lock the event row for the duration of the transaction to avoid two
   // clients grabbing the last seat at the same time.
@@ -55,21 +74,22 @@ export class ParticipationService {
     });
   }
 
+  // Returns the promoted user id (if any) so the caller can notify after commit.
   private async promoteFromWaitlist(
     tx: Tx,
     eventId: string,
     capacity: number,
-  ): Promise<void> {
+  ): Promise<number | null> {
     const count = await tx.eventParticipant.count({ where: { eventId } });
     if (count >= capacity) {
-      return;
+      return null;
     }
     const head = await tx.eventWaitlist.findFirst({
       where: { eventId },
       orderBy: { createdAt: 'asc' },
     });
     if (!head) {
-      return;
+      return null;
     }
     await tx.eventParticipant.create({
       data: {
@@ -82,6 +102,7 @@ export class ParticipationService {
     await this.logAction(tx, eventId, Number(head.userId), PARTICIPATION_ACTION.PROMOTED, {
       userId: Number(head.userId),
     });
+    return Number(head.userId);
   }
 
   async joinSelf(eventId: string, actorId: number): Promise<void> {
@@ -174,6 +195,21 @@ export class ParticipationService {
         userId: targetUserId,
       });
     });
+
+    // Notifications only after a successful commit.
+    const names = await this.users.getNameMap([actorId, targetUserId]);
+    const label = await this.eventLabel(eventId);
+    const actorName = names.get(actorId) ?? 'Учасник';
+    await this.telegram.notifyUser(
+      targetUserId,
+      `Вас додав(ла) ${actorName} на ${label}`,
+    );
+    if (role !== Role.admin) {
+      const targetName = names.get(targetUserId) ?? 'учасника';
+      await this.telegram.notifyAdmin(
+        `${actorName} додав(ла) ${targetName} на ${label}`,
+      );
+    }
   }
 
   async removeParticipant(
@@ -182,7 +218,7 @@ export class ParticipationService {
     role: Role,
     participantId: string,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const promotedUserId = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       const participant = await tx.eventParticipant.findUnique({
         where: { id: participantId },
@@ -210,12 +246,14 @@ export class ParticipationService {
           guestName: participant.guestName,
         },
       );
-      await this.promoteFromWaitlist(tx, eventId, event.capacity);
+      return this.promoteFromWaitlist(tx, eventId, event.capacity);
     });
+
+    await this.notifyPromoted(eventId, promotedUserId);
   }
 
   async leaveSelf(eventId: string, actorId: number): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const promotedUserId = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       const mine = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
@@ -225,13 +263,29 @@ export class ParticipationService {
         await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.LEAVE, {
           userId: actorId,
         });
-        await this.promoteFromWaitlist(tx, eventId, event.capacity);
-        return;
+        return this.promoteFromWaitlist(tx, eventId, event.capacity);
       }
       await tx.eventWaitlist.deleteMany({
         where: { eventId, userId: BigInt(actorId) },
       });
+      return null;
     });
+
+    await this.notifyPromoted(eventId, promotedUserId);
+  }
+
+  private async notifyPromoted(
+    eventId: string,
+    promotedUserId: number | null,
+  ): Promise<void> {
+    if (promotedUserId == null) {
+      return;
+    }
+    const label = await this.eventLabel(eventId);
+    await this.telegram.notifyUser(
+      promotedUserId,
+      `Ви з черги потрапили на ${label}`,
+    );
   }
 
   async joinWaitlist(eventId: string, actorId: number): Promise<void> {

@@ -18,6 +18,7 @@ import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
 import { AccessService } from '../access/access.service';
+import { EventsGateway } from '../realtime/events.gateway';
 import { ParticipationService } from './participation.service';
 import { AddParticipantDto } from './dto/add-participant.dto';
 
@@ -27,6 +28,7 @@ export class ParticipationController {
   constructor(
     private readonly participation: ParticipationService,
     private readonly access: AccessService,
+    private readonly gateway: EventsGateway,
   ) {}
 
   @Get('participants')
@@ -47,6 +49,7 @@ export class ParticipationController {
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
     await this.participation.joinSelf(eventId, user.id);
+    this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }
 
@@ -58,6 +61,7 @@ export class ParticipationController {
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
     await this.participation.leaveSelf(eventId, user.id);
+    this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }
 
@@ -70,6 +74,7 @@ export class ParticipationController {
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
     await this.participation.addParticipant(eventId, user.id, role, dto.userId);
+    this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }
 
@@ -87,6 +92,7 @@ export class ParticipationController {
       role,
       participantId,
     );
+    this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }
 
@@ -98,6 +104,7 @@ export class ParticipationController {
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
     await this.participation.joinWaitlist(eventId, user.id);
+    this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }
 
@@ -109,6 +116,7 @@ export class ParticipationController {
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
     await this.participation.leaveWaitlist(eventId, user.id);
+    this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }
 

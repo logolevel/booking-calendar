@@ -205,6 +205,18 @@ export class TelegramService {
     return Number.isFinite(adminId) && userId === adminId;
   }
 
+  // Best-effort private message to a user (works only if they started the bot).
+  async notifyUser(userId: number, text: string): Promise<void> {
+    await this.sendMessage(userId, text);
+  }
+
+  async notifyAdmin(text: string): Promise<void> {
+    const adminId = Number(this.config.get<string>('ADMIN_ID'));
+    if (Number.isFinite(adminId)) {
+      await this.sendMessage(adminId, text);
+    }
+  }
+
   private async sendMessage(chatId: number, text: string): Promise<void> {
     await this.callApi('sendMessage', { chat_id: chatId, text });
   }
