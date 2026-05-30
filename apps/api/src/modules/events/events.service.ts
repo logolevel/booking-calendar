@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
@@ -50,6 +51,8 @@ export class EventsService {
       await this.assertWithinDateLimit(startsAt);
     }
 
+    await this.assertNoOverlap(dto.resourceId, startsAt, endsAt);
+
     const event = await this.prisma.event.create({
       data: {
         type: dto.type,
@@ -62,6 +65,27 @@ export class EventsService {
       },
     });
     return this.toDto(event);
+  }
+
+  // Two events on the same resource (court) may not overlap in time.
+  // Overlap: existing.startsAt < newEndsAt AND existing.endsAt > newStartsAt.
+  private async assertNoOverlap(
+    resourceId: number,
+    startsAt: Date,
+    endsAt: Date,
+  ): Promise<void> {
+    const conflict = await this.prisma.event.findFirst({
+      where: {
+        resourceId,
+        startsAt: { lt: endsAt },
+        endsAt: { gt: startsAt },
+      },
+    });
+    if (conflict) {
+      throw new ConflictException(
+        'This court is already booked for the selected time',
+      );
+    }
   }
 
   private async assertWithinDateLimit(startsAt: Date): Promise<void> {

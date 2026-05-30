@@ -11,6 +11,7 @@ import {
 } from '@tg-calendar/shared-types';
 import { useCreateEvent } from '../useEvents';
 import { eventTypeLabel } from '../eventLabels';
+import { ApiError } from '../../../shared/api/client';
 import { Button } from '../../../shared/ui/Button';
 
 const EVENT_TYPES = Object.values(EVENT_TYPE);
@@ -76,6 +77,12 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
   const onEndChange = (value: string): void => {
     setEndsAt(value);
   };
+
+  const errorMessage = createEvent.isError
+    ? createEvent.error instanceof ApiError && createEvent.error.status === 409
+      ? 'Цей час на площадці вже зайнятий. Оберіть інший час або площадку.'
+      : 'Не вдалося створити подію (можливо, дата поза дозволеним діапазоном).'
+    : null;
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
@@ -158,11 +165,7 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         />
       </label>
 
-      {createEvent.isError && (
-        <p className="form__error">
-          Не вдалося створити подію (можливо, дата поза дозволеним діапазоном).
-        </p>
-      )}
+      {errorMessage && <p className="form__error">{errorMessage}</p>}
 
       <div className="form__actions">
         <Button variant="secondary" block onClick={onClose}>
