@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { format } from 'date-fns';
 import {
   DEFAULT_CAPACITY,
   EVENT_TYPE,
@@ -18,6 +19,19 @@ const CAPACITY_OPTIONS = Array.from(
   (_, i) => MIN_CAPACITY + i,
 );
 
+// datetime-local string with minutes forced to :00 (events start on the hour).
+const HOUR_PATTERN = "yyyy-MM-dd'T'HH:00";
+
+function nextHour(offsetHours = 0): string {
+  const d = new Date();
+  d.setHours(d.getHours() + 1 + offsetHours, 0, 0, 0);
+  return format(d, HOUR_PATTERN);
+}
+
+function toHourString(value: string): string {
+  return value ? `${value.slice(0, 13)}:00` : value;
+}
+
 interface Props {
   onClose: () => void;
 }
@@ -26,8 +40,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
   const [type, setType] = useState<EventType>(EVENT_TYPE.MIXED);
   const [resourceId, setResourceId] = useState<ResourceId>(RESOURCE_IDS[0]);
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
-  const [startsAt, setStartsAt] = useState<string>('');
-  const [endsAt, setEndsAt] = useState<string>('');
+  const [startsAt, setStartsAt] = useState<string>(() => nextHour());
+  const [endsAt, setEndsAt] = useState<string>(() => nextHour(1));
   const createEvent = useCreateEvent();
 
   const submit = (e: FormEvent): void => {
@@ -95,8 +109,9 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <span className="field__label">Початок</span>
         <input
           type="datetime-local"
+          step={3600}
           value={startsAt}
-          onChange={(e) => setStartsAt(e.target.value)}
+          onChange={(e) => setStartsAt(toHourString(e.target.value))}
         />
       </label>
 
@@ -104,8 +119,9 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <span className="field__label">Кінець</span>
         <input
           type="datetime-local"
+          step={3600}
           value={endsAt}
-          onChange={(e) => setEndsAt(e.target.value)}
+          onChange={(e) => setEndsAt(toHourString(e.target.value))}
         />
       </label>
 
