@@ -19,17 +19,12 @@ const CAPACITY_OPTIONS = Array.from(
   (_, i) => MIN_CAPACITY + i,
 );
 
-// datetime-local string with minutes forced to :00 (events start on the hour).
-const HOUR_PATTERN = "yyyy-MM-dd'T'HH:00";
-
+// Default datetime-local value: next full hour, minutes :00 (most common case).
+// The user can still pick any minute afterwards.
 function nextHour(offsetHours = 0): string {
   const d = new Date();
   d.setHours(d.getHours() + 1 + offsetHours, 0, 0, 0);
-  return format(d, HOUR_PATTERN);
-}
-
-function toHourString(value: string): string {
-  return value ? `${value.slice(0, 13)}:00` : value;
+  return format(d, "yyyy-MM-dd'T'HH:mm");
 }
 
 interface Props {
@@ -109,9 +104,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <span className="field__label">Початок</span>
         <input
           type="datetime-local"
-          step={3600}
           value={startsAt}
-          onChange={(e) => setStartsAt(toHourString(e.target.value))}
+          onChange={(e) => setStartsAt(e.target.value)}
         />
       </label>
 
@@ -119,9 +113,8 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <span className="field__label">Кінець</span>
         <input
           type="datetime-local"
-          step={3600}
           value={endsAt}
-          onChange={(e) => setEndsAt(toHourString(e.target.value))}
+          onChange={(e) => setEndsAt(e.target.value)}
         />
       </label>
 
