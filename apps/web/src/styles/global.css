@@ -518,10 +518,49 @@ button {
 }
 
 .rbc-header {
-  padding: 8px 4px;
+  padding: 6px 2px;
   font-weight: 600;
   color: var(--subtitle);
   border-bottom: 1px solid var(--border);
+}
+
+/* Google-Calendar-style day headers (weekday on top, big date below) */
+.rbc-day-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 0;
+}
+
+.rbc-day-head__weekday {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--hint);
+}
+
+.rbc-day-head__date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text);
+}
+
+.rbc-day-head.is-today .rbc-day-head__weekday {
+  color: var(--accent);
+}
+
+.rbc-day-head.is-today .rbc-day-head__date {
+  background: var(--accent);
+  color: var(--button-text);
 }
 
 .rbc-time-gutter,

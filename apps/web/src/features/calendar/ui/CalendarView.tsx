@@ -13,6 +13,7 @@ import { useEvents } from '../useEvents';
 import { toRbcEvent, type RbcEvent } from '../model/rbcEvent';
 import { Sheet } from '../../../shared/ui/Sheet';
 import { CalendarToolbar } from './CalendarToolbar';
+import { CalendarDayHeader } from './CalendarDayHeader';
 import { CreateEventForm } from './CreateEventForm';
 
 const localizer = dateFnsLocalizer({
@@ -28,13 +29,11 @@ const RESOURCE_COLORS: Record<number, string> = {
   2: 'var(--resource-2)',
 };
 
-const calendarComponents = { toolbar: CalendarToolbar };
-
-function defaultView(): View {
-  return typeof window !== 'undefined' && window.innerWidth < 768
-    ? Views.AGENDA
-    : Views.WEEK;
-}
+const calendarComponents = {
+  toolbar: CalendarToolbar,
+  week: { header: CalendarDayHeader },
+  day: { header: CalendarDayHeader },
+};
 
 interface Props {
   role: Role;
@@ -42,7 +41,7 @@ interface Props {
 
 export function CalendarView({ role }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
-  const [view, setView] = useState<View>(defaultView);
+  const [view, setView] = useState<View>(Views.WEEK);
   const [date, setDate] = useState<Date>(new Date());
   const [showForm, setShowForm] = useState<boolean>(false);
 
