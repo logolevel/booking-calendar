@@ -580,6 +580,11 @@ button {
   white-space: normal;
 }
 
+/* We don't use all-day events — hide the empty all-day row in time views */
+.rbc-time-view .rbc-allday-cell {
+  display: none;
+}
+
 .rbc-time-gutter,
 .rbc-timeslot-group .rbc-label,
 .rbc-label {
