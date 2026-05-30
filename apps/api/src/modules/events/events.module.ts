@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AccessModule } from '../access/access.module';
 import { SettingsModule } from '../settings/settings.module';
-import { MeController } from './me.controller';
+import { EventsController } from './events.controller';
+import { EventsService } from './events.service';
 
 @Module({
   imports: [AccessModule, SettingsModule],
-  controllers: [MeController],
+  controllers: [EventsController],
+  providers: [EventsService],
 })
-export class MeModule {}
+export class EventsModule {}

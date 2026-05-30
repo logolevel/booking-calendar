@@ -1,50 +1,29 @@
-import { useQuery } from '@tanstack/react-query';
-import type { MeResponse } from '@tg-calendar/shared-types';
+import { useMe } from './features/auth/useMe';
+import { ApiError } from './shared/api/client';
+import { CalendarView } from './features/calendar/ui/CalendarView';
 
-async function fetchMe(): Promise<MeResponse> {
-  const initData = window.Telegram?.WebApp.initData ?? '';
-  const res = await fetch('/api/me', {
-    headers: { Authorization: `tma ${initData}` },
-  });
-  if (res.status === 401) {
-    throw new Error('unauthorized');
-  }
-  if (res.status === 403) {
-    throw new Error('forbidden');
-  }
-  if (!res.ok) {
-    throw new Error('request_failed');
-  }
-  return (await res.json()) as MeResponse;
-}
+const containerStyle: React.CSSProperties = {
+  fontFamily: 'system-ui, sans-serif',
+  color: 'var(--tg-theme-text-color, #000)',
+  background: 'var(--tg-theme-bg-color, #fff)',
+  minHeight: '100vh',
+};
 
 export function App(): JSX.Element {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['me'],
-    queryFn: fetchMe,
-    retry: false,
-  });
-
-  const containerStyle: React.CSSProperties = {
-    fontFamily: 'system-ui, sans-serif',
-    padding: '24px',
-    color: 'var(--tg-theme-text-color, #000)',
-    background: 'var(--tg-theme-bg-color, #fff)',
-    minHeight: '100vh',
-  };
+  const { data: me, isLoading, error } = useMe();
 
   if (isLoading) {
     return (
-      <main style={containerStyle}>
+      <main style={{ ...containerStyle, padding: 24 }}>
         <p>Завантаження…</p>
       </main>
     );
   }
 
   if (error) {
-    const forbidden = error instanceof Error && error.message === 'forbidden';
+    const forbidden = error instanceof ApiError && error.status === 403;
     return (
-      <main style={containerStyle}>
+      <main style={{ ...containerStyle, padding: 24 }}>
         <h1>TG Calendar</h1>
         <p>
           {forbidden
@@ -57,9 +36,7 @@ export function App(): JSX.Element {
 
   return (
     <main style={containerStyle}>
-      <h1>TG Calendar</h1>
-      <p>Вітаємо, {data?.firstName}!</p>
-      <p>Роль: {data?.role}</p>
+      <CalendarView role={me?.role ?? 'external'} />
     </main>
   );
 }

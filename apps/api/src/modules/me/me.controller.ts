@@ -9,11 +9,15 @@ import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
 import { AccessService } from '../access/access.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Controller('api')
 @UseGuards(TelegramAuthGuard)
 export class MeController {
-  constructor(private readonly access: AccessService) {}
+  constructor(
+    private readonly access: AccessService,
+    private readonly settings: SettingsService,
+  ) {}
 
   @Get('me')
   async me(@CurrentUser() user: VerifiedTelegramUser): Promise<MeResponse> {
@@ -23,6 +27,7 @@ export class MeController {
     }
 
     await this.access.syncUser(user, role);
+    const maxDaysAhead = await this.settings.getMaxDaysAhead();
 
     return {
       id: user.id,
@@ -30,6 +35,7 @@ export class MeController {
       firstName: user.firstName,
       lastName: user.lastName,
       username: user.username,
+      maxDaysAhead,
     };
   }
 }

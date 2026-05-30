@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AccessService } from '../access/access.service';
+import { SettingsService } from '../settings/settings.service';
 import type { TelegramUpdate } from './telegram.types';
 
 interface TelegramApiResponse<T> {
@@ -16,6 +17,7 @@ export class TelegramService {
   constructor(
     private readonly config: ConfigService,
     private readonly access: AccessService,
+    private readonly settings: SettingsService,
   ) {}
 
   private get apiBase(): string {
@@ -89,9 +91,38 @@ export class TelegramService {
       return;
     }
 
+    if (text.startsWith('/get_max_days')) {
+      const days = await this.settings.getMaxDaysAhead();
+      await this.sendMessage(chatId, `maxDaysAhead: ${days}`);
+      return;
+    }
+
+    if (text.startsWith('/set_max_days')) {
+      await this.handleSetMaxDays(chatId, fromId, text);
+      return;
+    }
+
     if (text.startsWith('/grant') || text.startsWith('/revoke')) {
       await this.handleAccessCommand(chatId, fromId, text);
     }
+  }
+
+  private async handleSetMaxDays(
+    chatId: number,
+    fromId: number,
+    text: string,
+  ): Promise<void> {
+    if (!this.isAdmin(fromId)) {
+      return;
+    }
+    const [, rawDays] = text.split(/\s+/, 2);
+    const days = Number(rawDays);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      await this.sendMessage(chatId, 'Usage: /set_max_days <1..365>');
+      return;
+    }
+    await this.settings.setMaxDaysAhead(days);
+    await this.sendMessage(chatId, `maxDaysAhead set to ${days}`);
   }
 
   private async handleAccessCommand(
