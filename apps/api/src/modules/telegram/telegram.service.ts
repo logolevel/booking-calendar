@@ -3,9 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { AccessService } from '../access/access.service';
 import type { TelegramUpdate } from './telegram.types';
 
+interface TelegramApiResponse<T> {
+  ok: boolean;
+  result?: T;
+}
+
 @Injectable()
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
+  private cachedUsername: string | null = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -20,6 +26,23 @@ export class TelegramService {
     return `https://api.telegram.org/bot${token}`;
   }
 
+  private async callApi<T = unknown>(
+    method: string,
+    payload: Record<string, unknown>,
+  ): Promise<TelegramApiResponse<T> | null> {
+    try {
+      const res = await fetch(`${this.apiBase}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return (await res.json()) as TelegramApiResponse<T>;
+    } catch (error) {
+      this.logger.error(`Telegram API ${method} failed`, error as Error);
+      return null;
+    }
+  }
+
   // Tell Telegram to deliver updates to our webhook endpoint.
   async registerWebhook(): Promise<void> {
     const webhookUrl = this.config.get<string>('WEBHOOK_URL');
@@ -27,18 +50,11 @@ export class TelegramService {
       this.logger.warn('WEBHOOK_URL is not set, skipping webhook registration');
       return;
     }
-
-    try {
-      const res = await fetch(`${this.apiBase}/setWebhook`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: webhookUrl, drop_pending_updates: false }),
-      });
-      const data: unknown = await res.json();
-      this.logger.log(`setWebhook -> ${JSON.stringify(data)}`);
-    } catch (error) {
-      this.logger.error('Failed to register webhook', error as Error);
-    }
+    const data = await this.callApi('setWebhook', {
+      url: webhookUrl,
+      drop_pending_updates: false,
+    });
+    this.logger.log(`setWebhook -> ${JSON.stringify(data)}`);
   }
 
   async handleUpdate(update: TelegramUpdate): Promise<void> {
@@ -65,6 +81,14 @@ export class TelegramService {
       return;
     }
 
+    // Admin posts a pinned button that opens the Mini App in this chat.
+    if (text.startsWith('/post_calendar')) {
+      if (this.isAdmin(fromId)) {
+        await this.postCalendarButton(chatId);
+      }
+      return;
+    }
+
     if (text.startsWith('/grant') || text.startsWith('/revoke')) {
       await this.handleAccessCommand(chatId, fromId, text);
     }
@@ -82,7 +106,10 @@ export class TelegramService {
     const [command, rawId] = text.split(/\s+/, 2);
     const targetId = Number(rawId);
     if (!Number.isInteger(targetId)) {
-      await this.sendMessage(chatId, 'Usage: /grant <user_id> | /revoke <user_id>');
+      await this.sendMessage(
+        chatId,
+        'Usage: /grant <user_id> | /revoke <user_id>',
+      );
       return;
     }
 
@@ -95,20 +122,59 @@ export class TelegramService {
     }
   }
 
+  private async postCalendarButton(chatId: number): Promise<void> {
+    const deepLink = await this.getMiniAppDeepLink();
+    if (!deepLink) {
+      await this.sendMessage(
+        chatId,
+        'Mini App link is not configured (set WEBAPP_DEEP_LINK).',
+      );
+      return;
+    }
+
+    const sent = await this.callApi<{ message_id: number }>('sendMessage', {
+      chat_id: chatId,
+      text: 'Натисніть, щоб відкрити календар бронювань 👇',
+      reply_markup: {
+        inline_keyboard: [[{ text: '📅 Відкрити календар', url: deepLink }]],
+      },
+    });
+
+    const messageId = sent?.result?.message_id;
+    if (messageId) {
+      await this.callApi('pinChatMessage', {
+        chat_id: chatId,
+        message_id: messageId,
+        disable_notification: true,
+      });
+    }
+  }
+
+  // Prefer an explicit deep link; otherwise build it from the bot username.
+  private async getMiniAppDeepLink(): Promise<string | null> {
+    const explicit = this.config.get<string>('WEBAPP_DEEP_LINK');
+    if (explicit) {
+      return explicit;
+    }
+    const username = await this.getBotUsername();
+    return username ? `https://t.me/${username}?startapp` : null;
+  }
+
+  private async getBotUsername(): Promise<string | null> {
+    if (this.cachedUsername) {
+      return this.cachedUsername;
+    }
+    const data = await this.callApi<{ username?: string }>('getMe', {});
+    this.cachedUsername = data?.result?.username ?? null;
+    return this.cachedUsername;
+  }
+
   private isAdmin(userId: number): boolean {
     const adminId = Number(this.config.get<string>('ADMIN_ID'));
     return Number.isFinite(adminId) && userId === adminId;
   }
 
   private async sendMessage(chatId: number, text: string): Promise<void> {
-    try {
-      await fetch(`${this.apiBase}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text }),
-      });
-    } catch (error) {
-      this.logger.error('Failed to send message', error as Error);
-    }
+    await this.callApi('sendMessage', { chat_id: chatId, text });
   }
 }
