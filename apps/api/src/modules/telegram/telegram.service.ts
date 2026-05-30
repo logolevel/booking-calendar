@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AccessService } from '../access/access.service';
 import type { TelegramUpdate } from './telegram.types';
 
 @Injectable()
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly access: AccessService,
+  ) {}
 
   private get apiBase(): string {
     const token = this.config.get<string>('BOT_TOKEN');
@@ -43,12 +47,57 @@ export class TelegramService {
       return;
     }
 
-    if (message.text.startsWith('/start')) {
+    const text = message.text.trim();
+    const chatId = message.chat.id;
+    const fromId = message.from.id;
+
+    if (text.startsWith('/start')) {
       await this.sendMessage(
-        message.chat.id,
+        chatId,
         'Вітаю! Відкрийте календар через меню застосунку.',
       );
+      return;
     }
+
+    // Returns current chat id, useful to obtain GROUP_CHAT_ID.
+    if (text.startsWith('/chatid')) {
+      await this.sendMessage(chatId, `chat_id: ${chatId}`);
+      return;
+    }
+
+    if (text.startsWith('/grant') || text.startsWith('/revoke')) {
+      await this.handleAccessCommand(chatId, fromId, text);
+    }
+  }
+
+  private async handleAccessCommand(
+    chatId: number,
+    fromId: number,
+    text: string,
+  ): Promise<void> {
+    if (!this.isAdmin(fromId)) {
+      return;
+    }
+
+    const [command, rawId] = text.split(/\s+/, 2);
+    const targetId = Number(rawId);
+    if (!Number.isInteger(targetId)) {
+      await this.sendMessage(chatId, 'Usage: /grant <user_id> | /revoke <user_id>');
+      return;
+    }
+
+    if (command.startsWith('/grant')) {
+      await this.access.grantExternal(targetId, fromId);
+      await this.sendMessage(chatId, `Granted external access to ${targetId}`);
+    } else {
+      await this.access.revokeExternal(targetId);
+      await this.sendMessage(chatId, `Revoked access for ${targetId}`);
+    }
+  }
+
+  private isAdmin(userId: number): boolean {
+    const adminId = Number(this.config.get<string>('ADMIN_ID'));
+    return Number.isFinite(adminId) && userId === adminId;
   }
 
   private async sendMessage(chatId: number, text: string): Promise<void> {

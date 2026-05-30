@@ -1,9 +1,10 @@
-export const PERMISSION = {
+export const ROLE = {
   ADMIN: 'admin',
-  USER: 'user',
+  MEMBER: 'member',
+  EXTERNAL: 'external',
 } as const;
 
-export type Role = (typeof PERMISSION)[keyof typeof PERMISSION];
+export type Role = (typeof ROLE)[keyof typeof ROLE];
 
 export interface TelegramUser {
   id: number;
@@ -15,6 +16,14 @@ export interface TelegramUser {
 export interface HealthResponse {
   status: 'ok';
   timestamp: string;
+}
+
+export interface MeResponse {
+  id: number;
+  role: Role;
+  firstName: string;
+  lastName?: string;
+  username?: string;
 }
 
 export interface CalendarEvent {

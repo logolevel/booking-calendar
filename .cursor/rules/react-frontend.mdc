@@ -1,0 +1,15 @@
+---
+description: Конвенции фронтенда React
+globs: apps/web/**/*.tsx
+alwaysApply: false
+---
+
+# React
+
+- Только функциональные компоненты + хуки.
+- Организация по фичам: `features/<feature>/{ui,model,api}`.
+- Серверное состояние — через TanStack Query, не useEffect+fetch вручную.
+- API-вызовы — через типизированный клиент в `shared/api`, типы из shared-types.
+- Никакой бизнес-логики в JSX — выносить в хуки `useXxx`.
+- Компоненты оболочки (навигация, кнопки) — из Telegram UI, чтобы вид был
+  нативным для Telegram.

@@ -1,0 +1,30 @@
+---
+description: Специфика Telegram Mini App (auth, адаптивная тема)
+globs: apps/**/*.ts*
+alwaysApply: false
+---
+
+# Telegram Mini App
+
+## Аутентификация
+- Фронт шлёт `initData`, бэк ВСЕГДА проверяет HMAC-подпись ботом
+  (secret = HMAC-SHA256("WebAppData", BOT_TOKEN)) и срок `auth_date`.
+- Никогда не доверять `user.id`/роли с фронта без проверки.
+- Все защищённые эндпоинты — за guard, который валидирует initData.
+
+```typescript
+@Injectable()
+export class TelegramAuthGuard implements CanActivate { /* verify HMAC */ }
+```
+
+## Тема (адаптивная, follow за пользователем)
+- НЕ хардкодить цвета и НЕ форсить тёмную/светлую тему.
+- Брать тему только из Telegram: CSS-переменные `--tg-theme-*` и
+  `WebApp.colorScheme` ('light' | 'dark'). Telegram сам следует за системной
+  темой устройства (iOS/Android/macOS/Windows).
+- Подписываться на событие `themeChanged` и обновлять UI на лету.
+- Компоненты Telegram UI берут тему автоматически — не переопределять цвета.
+
+## SDK
+- Использовать `@telegram-apps/sdk` (или `window.Telegram.WebApp`):
+  `ready()`, `expand()`, тема через `themeParams`.

@@ -1,0 +1,23 @@
+---
+description: Конвенции бэкенда NestJS
+globs: apps/api/**/*.ts
+alwaysApply: false
+---
+
+# NestJS
+
+- Структура модуля: `<domain>.module.ts`, `.controller.ts`, `.service.ts`,
+  `dto/`, `entities/`.
+- Все входные данные — через DTO с `class-validator` + `ValidationPipe`
+  (whitelist: true).
+- Бросать доменные ошибки через `HttpException`-наследников, не голые строки.
+- Доступ к БД — только через сервисы (Prisma), не из контроллеров.
+- Конфиги — через `@nestjs/config`, секреты не хардкодить.
+
+```typescript
+// DTO с валидацией
+export class CreateEventDto {
+  @IsString() @MaxLength(120) title: string;
+  @IsISO8601() startsAt: string;
+}
+```

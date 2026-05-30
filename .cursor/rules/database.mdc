@@ -1,0 +1,14 @@
+---
+description: Работа с БД через Prisma
+globs: apps/api/**/*.ts
+alwaysApply: false
+---
+
+# База данных
+
+- Схема в `apps/api/prisma/schema.prisma`. Любое изменение схемы =
+  миграция (`prisma migrate dev`), не править БД руками.
+- Доступ к Prisma — через инжектируемый `PrismaService`.
+- Временные поля хранить в UTC; роль пользователя (`is_admin`/`role`) — в БД,
+  не вычислять на клиенте.
+- Не делать N+1: использовать `include`/`select` осознанно.
