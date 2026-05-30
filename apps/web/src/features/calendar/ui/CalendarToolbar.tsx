@@ -3,6 +3,7 @@ import type { RbcEvent } from '../model/rbcEvent';
 
 const VIEW_LABELS: Record<string, string> = {
   day: 'День',
+  three_day: '3 дні',
   week: 'Тиждень',
   work_week: 'Робочий тиждень',
   month: 'Місяць',

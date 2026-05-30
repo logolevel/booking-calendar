@@ -1,4 +1,10 @@
-import { useMemo, useRef, useState, type TouchEvent } from 'react';
+import {
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type TouchEvent,
+} from 'react';
 import {
   Calendar,
   dateFnsLocalizer,
@@ -26,7 +32,10 @@ import { Sheet } from '../../../shared/ui/Sheet';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarDayHeader } from './CalendarDayHeader';
 import { EventForm } from './EventForm';
+import { ThreeDayView } from './ThreeDayView';
 import { ParticipantsPanel } from '../../participation/ui/ParticipantsPanel';
+
+const THREE_DAY_VIEW = 'three_day';
 
 const localizer = dateFnsLocalizer({
   format,
@@ -41,18 +50,33 @@ const RESOURCE_COLORS: Record<number, string> = {
   2: 'var(--resource-2)',
 };
 
+type CalendarProps = ComponentProps<typeof Calendar<RbcEvent>>;
+
+// Custom keys (three_day) require loosening the strict view typings.
 const calendarComponents = {
   toolbar: CalendarToolbar,
   week: { header: CalendarDayHeader },
   day: { header: CalendarDayHeader },
-};
+  [THREE_DAY_VIEW]: { header: CalendarDayHeader },
+} as unknown as CalendarProps['components'];
+
+// Tab order; "Список" (agenda) sits last, after "Місяць".
+const calendarViews = {
+  day: true,
+  [THREE_DAY_VIEW]: ThreeDayView,
+  week: true,
+  month: true,
+  agenda: true,
+} as unknown as CalendarProps['views'];
 
 const SWIPE_MIN_DISTANCE = 60;
 
-function shiftDate(date: Date, view: View, direction: 1 | -1): Date {
+function shiftDate(date: Date, view: string, direction: 1 | -1): Date {
   switch (view) {
     case Views.DAY:
       return addDays(date, direction);
+    case THREE_DAY_VIEW:
+      return addDays(date, direction * 3);
     case Views.MONTH:
       return addMonths(date, direction);
     case Views.AGENDA:
@@ -165,7 +189,7 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
         date={date}
         onNavigate={setDate}
         onSelectEvent={openDetails}
-        views={[Views.DAY, Views.WEEK, Views.AGENDA, Views.MONTH]}
+        views={calendarViews}
         components={calendarComponents}
         dayPropGetter={dayPropGetter}
         min={new Date(1970, 0, 1, 8, 0, 0)}
