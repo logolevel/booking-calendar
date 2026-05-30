@@ -13,6 +13,10 @@ import { eventTypeLabel } from '../eventLabels';
 import { Button } from '../../../shared/ui/Button';
 
 const EVENT_TYPES = Object.values(EVENT_TYPE);
+const CAPACITY_OPTIONS = Array.from(
+  { length: MAX_CAPACITY - MIN_CAPACITY + 1 },
+  (_, i) => MIN_CAPACITY + i,
+);
 
 interface Props {
   onClose: () => void;
@@ -75,13 +79,16 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
 
       <label className="field">
         <span className="field__label">Ліміт учасників</span>
-        <input
-          type="number"
-          min={MIN_CAPACITY}
-          max={MAX_CAPACITY}
+        <select
           value={capacity}
           onChange={(e) => setCapacity(Number(e.target.value))}
-        />
+        >
+          {CAPACITY_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </label>
 
       <label className="field">
