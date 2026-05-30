@@ -73,3 +73,5 @@ export interface CreateEventRequest {
   startsAt: string;
   endsAt: string;
 }
+
+export type UpdateEventRequest = CreateEventRequest;

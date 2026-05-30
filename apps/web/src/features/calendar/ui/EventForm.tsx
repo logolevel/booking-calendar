@@ -6,10 +6,11 @@ import {
   MAX_CAPACITY,
   MIN_CAPACITY,
   RESOURCE_IDS,
+  type EventDto,
   type EventType,
   type ResourceId,
 } from '@tg-calendar/shared-types';
-import { useCreateEvent } from '../useEvents';
+import { useCreateEvent, useUpdateEvent } from '../useEvents';
 import { eventTypeLabel } from '../eventLabels';
 import { ApiError } from '../../../shared/api/client';
 import { Button } from '../../../shared/ui/Button';
@@ -31,6 +32,10 @@ function currentHour(): string {
   return format(d, LOCAL_PATTERN);
 }
 
+function toLocalInput(iso: string): string {
+  return format(new Date(iso), LOCAL_PATTERN);
+}
+
 function addHours(value: string, hours: number): string {
   if (!value) {
     return '';
@@ -44,23 +49,36 @@ function addHours(value: string, hours: number): string {
 }
 
 interface Props {
+  event?: EventDto;
   onClose: () => void;
 }
 
-export function CreateEventForm({ onClose }: Props): JSX.Element {
-  const [type, setType] = useState<EventType>(EVENT_TYPE.MIXED);
-  const [resourceId, setResourceId] = useState<ResourceId>(RESOURCE_IDS[0]);
-  const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
-  const [startsAt, setStartsAt] = useState<string>(currentHour);
-  const [endsAt, setEndsAt] = useState<string>('');
+export function EventForm({ event, onClose }: Props): JSX.Element {
+  const isEdit = Boolean(event);
+  const [type, setType] = useState<EventType>(event?.type ?? EVENT_TYPE.MIXED);
+  const [resourceId, setResourceId] = useState<ResourceId>(
+    event?.resourceId ?? RESOURCE_IDS[0],
+  );
+  const [capacity, setCapacity] = useState<number>(
+    event?.capacity ?? DEFAULT_CAPACITY,
+  );
+  const [startsAt, setStartsAt] = useState<string>(
+    event ? toLocalInput(event.startsAt) : currentHour(),
+  );
+  const [endsAt, setEndsAt] = useState<string>(
+    event ? toLocalInput(event.endsAt) : '',
+  );
   // The end field stays disabled until the user actively sets the start.
-  const [startTouched, setStartTouched] = useState<boolean>(false);
+  const [startTouched, setStartTouched] = useState<boolean>(isEdit);
+
   const createEvent = useCreateEvent();
+  const updateEvent = useUpdateEvent();
+  const mutation = isEdit ? updateEvent : createEvent;
 
   // Drop a stale submit error as soon as the user changes anything.
   const clearError = (): void => {
-    if (createEvent.isError) {
-      createEvent.reset();
+    if (mutation.isError) {
+      mutation.reset();
     }
   };
 
@@ -87,10 +105,10 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
     setEndsAt(value);
   };
 
-  const errorMessage = createEvent.isError
-    ? createEvent.error instanceof ApiError && createEvent.error.status === 409
+  const errorMessage = mutation.isError
+    ? mutation.error instanceof ApiError && mutation.error.status === 409
       ? 'Цей час на площадці вже зайнятий. Оберіть інший час або площадку.'
-      : 'Не вдалося створити подію (можливо, дата поза дозволеним діапазоном).'
+      : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
     : null;
 
   const submit = (e: FormEvent): void => {
@@ -98,16 +116,19 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
     if (!startsAt || !endsAt) {
       return;
     }
-    createEvent.mutate(
-      {
-        type,
-        resourceId,
-        capacity,
-        startsAt: new Date(startsAt).toISOString(),
-        endsAt: new Date(endsAt).toISOString(),
-      },
-      { onSuccess: onClose },
-    );
+    const body = {
+      type,
+      resourceId,
+      capacity,
+      title: event?.title ?? undefined,
+      startsAt: new Date(startsAt).toISOString(),
+      endsAt: new Date(endsAt).toISOString(),
+    };
+    if (event) {
+      updateEvent.mutate({ id: event.id, body }, { onSuccess: onClose });
+    } else {
+      createEvent.mutate(body, { onSuccess: onClose });
+    }
   };
 
   return (
@@ -192,7 +213,7 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <Button
           type="submit"
           block
-          disabled={createEvent.isPending || !startsAt || !endsAt}
+          disabled={mutation.isPending || !startsAt || !endsAt}
         >
           Зберегти
         </Button>

@@ -15,14 +15,14 @@ import {
   addMonths,
 } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { ROLE, type Role } from '@tg-calendar/shared-types';
+import { ROLE, type EventDto, type Role } from '@tg-calendar/shared-types';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { useEvents } from '../useEvents';
 import { toRbcEvent, type RbcEvent } from '../model/rbcEvent';
 import { Sheet } from '../../../shared/ui/Sheet';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarDayHeader } from './CalendarDayHeader';
-import { CreateEventForm } from './CreateEventForm';
+import { EventForm } from './EventForm';
 
 const localizer = dateFnsLocalizer({
   format,
@@ -66,9 +66,25 @@ export function CalendarView({ role }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
   const [view, setView] = useState<View>(Views.WEEK);
   const [date, setDate] = useState<Date>(new Date());
-  const [showForm, setShowForm] = useState<boolean>(false);
+  const [formOpen, setFormOpen] = useState<boolean>(false);
+  const [editEvent, setEditEvent] = useState<EventDto | null>(null);
 
   const canCreate = role === ROLE.ADMIN || role === ROLE.MEMBER;
+
+  const openCreate = (): void => {
+    setEditEvent(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (event: RbcEvent): void => {
+    setEditEvent(event.raw);
+    setFormOpen(true);
+  };
+
+  const closeForm = (): void => {
+    setFormOpen(false);
+    setEditEvent(null);
+  };
 
   const events = useMemo<RbcEvent[]>(
     () => (data ?? []).map(toRbcEvent),
@@ -78,7 +94,7 @@ export function CalendarView({ role }: Props): JSX.Element {
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const onTouchStart = (e: TouchEvent): void => {
-    if (showForm) {
+    if (formOpen) {
       return;
     }
     const t = e.touches[0];
@@ -88,7 +104,7 @@ export function CalendarView({ role }: Props): JSX.Element {
   const onTouchEnd = (e: TouchEvent): void => {
     const start = touchStart.current;
     touchStart.current = null;
-    if (!start || showForm) {
+    if (!start || formOpen) {
       return;
     }
     const t = e.changedTouches[0];
@@ -118,6 +134,7 @@ export function CalendarView({ role }: Props): JSX.Element {
         onView={setView}
         date={date}
         onNavigate={setDate}
+        onSelectEvent={openEdit}
         views={[Views.DAY, Views.WEEK, Views.AGENDA, Views.MONTH]}
         components={calendarComponents}
         min={new Date(1970, 0, 1, 8, 0, 0)}
@@ -137,15 +154,18 @@ export function CalendarView({ role }: Props): JSX.Element {
           type="button"
           className="fab"
           aria-label="Створити подію"
-          onClick={() => setShowForm(true)}
+          onClick={openCreate}
         >
           +
         </button>
       )}
 
-      {showForm && canCreate && (
-        <Sheet title="Нова подія" onClose={() => setShowForm(false)}>
-          <CreateEventForm onClose={() => setShowForm(false)} />
+      {formOpen && (
+        <Sheet
+          title={editEvent ? 'Редагувати подію' : 'Нова подія'}
+          onClose={closeForm}
+        >
+          <EventForm event={editEvent ?? undefined} onClose={closeForm} />
         </Sheet>
       )}
     </div>

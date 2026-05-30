@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   Get,
   Headers,
+  Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -65,6 +67,18 @@ export class EventsController {
     // Admins previewing a non-admin role are subject to that role's limits.
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     return this.events.create(user.id, role, dto);
+  }
+
+  @Patch(':id')
+  async update(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('id') id: string,
+    @Body() dto: CreateEventDto,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
+  ): Promise<EventDto> {
+    const realRole = await this.requireAccess(user.id);
+    const role = this.access.applyPreview(realRole, preview) ?? realRole;
+    return this.events.update(id, role, dto);
   }
 
   private async requireAccess(userId: number) {

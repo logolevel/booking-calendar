@@ -6,6 +6,7 @@ export interface RbcEvent {
   start: Date;
   end: Date;
   resourceId: number;
+  raw: EventDto;
 }
 
 export function toRbcEvent(event: EventDto): RbcEvent {
@@ -14,5 +15,6 @@ export function toRbcEvent(event: EventDto): RbcEvent {
     start: new Date(event.startsAt),
     end: new Date(event.endsAt),
     resourceId: event.resourceId,
+    raw: event,
   };
 }

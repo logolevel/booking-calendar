@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import type { EventDto, ResourceId } from '@tg-calendar/shared-types';
@@ -67,18 +68,56 @@ export class EventsService {
     return this.toDto(event);
   }
 
+  async update(
+    id: string,
+    role: Role,
+    dto: CreateEventDto,
+  ): Promise<EventDto> {
+    const existing = await this.prisma.event.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Event not found');
+    }
+
+    const startsAt = new Date(dto.startsAt);
+    const endsAt = new Date(dto.endsAt);
+    if (endsAt <= startsAt) {
+      throw new BadRequestException('endsAt must be after startsAt');
+    }
+
+    if (role !== Role.admin) {
+      await this.assertWithinDateLimit(startsAt);
+    }
+
+    await this.assertNoOverlap(dto.resourceId, startsAt, endsAt, id);
+
+    const event = await this.prisma.event.update({
+      where: { id },
+      data: {
+        type: dto.type,
+        resourceId: dto.resourceId,
+        title: dto.title ?? null,
+        capacity: dto.capacity,
+        startsAt,
+        endsAt,
+      },
+    });
+    return this.toDto(event);
+  }
+
   // Two events on the same resource (court) may not overlap in time.
   // Overlap: existing.startsAt < newEndsAt AND existing.endsAt > newStartsAt.
   private async assertNoOverlap(
     resourceId: number,
     startsAt: Date,
     endsAt: Date,
+    excludeId?: string,
   ): Promise<void> {
     const conflict = await this.prisma.event.findFirst({
       where: {
         resourceId,
         startsAt: { lt: endsAt },
         endsAt: { gt: startsAt },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
       },
     });
     if (conflict) {
