@@ -22,15 +22,22 @@ enum EventType {
   tech_men
 }
 
+enum Gender {
+  male
+  female
+}
+
 model User {
-  id        BigInt   @id
-  firstName String
-  lastName  String?
-  username  String?
-  role      Role     @default(member)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  events    Event[]
+  id          BigInt    @id
+  firstName   String
+  lastName    String?
+  username    String?
+  gender      Gender?
+  onboardedAt DateTime?
+  role        Role      @default(member)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  events      Event[]
 }
 
 // Users granted access from outside the group, managed by the admin.

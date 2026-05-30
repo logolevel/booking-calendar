@@ -4,6 +4,7 @@ import { usePreviewRole } from './features/auth/usePreviewRole';
 import { RoleSwitch } from './features/auth/ui/RoleSwitch';
 import { ApiError } from './shared/api/client';
 import { CalendarView } from './features/calendar/ui/CalendarView';
+import { OnboardingForm } from './features/onboarding/ui/OnboardingForm';
 
 const ROLE_LABELS: Record<Role, string> = {
   [ROLE.ADMIN]: 'Адмін',
@@ -58,6 +59,14 @@ export function App(): JSX.Element {
               : 'Відкрийте застосунок через Telegram.'
           }
         />
+      </div>
+    );
+  }
+
+  if (!me.profileComplete) {
+    return (
+      <div className="app">
+        <OnboardingForm me={me} />
       </div>
     );
   }

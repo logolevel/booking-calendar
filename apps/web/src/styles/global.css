@@ -16,6 +16,11 @@
   --resource-1: #2e9e5b;
   --resource-2: #e0564f;
 
+  --gender-female: #e0568f;
+  --gender-female-bg: rgba(224, 86, 143, 0.12);
+  --gender-male: #2f80d8;
+  --gender-male-bg: rgba(47, 128, 216, 0.12);
+
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 9px;
@@ -440,6 +445,75 @@ button {
   display: flex;
   gap: 10px;
   margin-top: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Onboarding                                                          */
+/* ------------------------------------------------------------------ */
+.onboarding {
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.onboarding__card {
+  width: 100%;
+  max-width: 440px;
+}
+
+.onboarding__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.onboarding__subtitle {
+  font-size: 14px;
+  color: var(--hint);
+  margin: 0 0 20px;
+}
+
+.gender-select {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gender-select__btn {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--secondary-bg);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.gender-select__btn--female {
+  border-color: var(--gender-female);
+  background: var(--gender-female-bg);
+  color: var(--gender-female);
+}
+
+.gender-select__btn--male {
+  border-color: var(--gender-male);
+  background: var(--gender-male-bg);
+  color: var(--gender-male);
+}
+
+/* ------------------------------------------------------------------ */
+/* Person name (gender color + role badge)                             */
+/* ------------------------------------------------------------------ */
+.person__badge {
+  margin-right: 4px;
+}
+
+.person--female {
+  color: var(--gender-female);
+}
+
+.person--male {
+  color: var(--gender-male);
 }
 
 /* ------------------------------------------------------------------ */

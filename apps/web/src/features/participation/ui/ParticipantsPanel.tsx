@@ -7,6 +7,7 @@ import type {
 } from '@tg-calendar/shared-types';
 import { eventTypeLabel } from '../../calendar/eventLabels';
 import { Button } from '../../../shared/ui/Button';
+import { PersonName } from '../../../shared/ui/PersonName';
 import {
   useEventParticipants,
   useParticipationActions,
@@ -141,7 +142,12 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
             {data.participants.map((p) => (
               <li key={p.id} className="participants__item">
                 <span className="participants__name">
-                  {p.name}
+                  <PersonName
+                    name={p.name}
+                    gender={p.gender}
+                    isAdmin={p.isAdmin}
+                    isUser={p.userId != null}
+                  />
                   {p.isSelf && <span className="participants__you"> (ви)</span>}
                   {p.userId !== p.addedByUserId && (
                     <span className="participants__by">
@@ -213,7 +219,13 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
                 {data.waitlist.map((w, i) => (
                   <li key={w.userId} className="participants__item">
                     <span className="participants__name">
-                      {i + 1}. {w.name}
+                      {i + 1}.{' '}
+                      <PersonName
+                        name={w.name}
+                        gender={w.gender}
+                        isAdmin={w.isAdmin}
+                        isUser
+                      />
                       {w.isSelf && <span className="participants__you"> (ви)</span>}
                     </span>
                     {w.isSelf && (

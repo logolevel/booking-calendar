@@ -74,9 +74,8 @@ export class AccessService {
         username: user.username ?? null,
         role,
       },
+      // Do not overwrite firstName/lastName: they may be set during onboarding.
       update: {
-        firstName: user.firstName,
-        lastName: user.lastName ?? null,
         username: user.username ?? null,
         role,
       },

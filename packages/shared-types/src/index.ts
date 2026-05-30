@@ -6,6 +6,13 @@ export const ROLE = {
 
 export type Role = (typeof ROLE)[keyof typeof ROLE];
 
+export const GENDER = {
+  MALE: 'male',
+  FEMALE: 'female',
+} as const;
+
+export type Gender = (typeof GENDER)[keyof typeof GENDER];
+
 export const EVENT_TYPE = {
   WOMEN: 'women',
   MEN: 'men',
@@ -48,7 +55,16 @@ export interface MeResponse {
   firstName: string;
   lastName?: string;
   username?: string;
+  gender: Gender | null;
+  // Onboarding done: name + gender provided.
+  profileComplete: boolean;
   maxDaysAhead: number;
+}
+
+export interface OnboardingRequest {
+  firstName: string;
+  lastName: string;
+  gender: Gender;
 }
 
 // Header used by an admin to preview the app as another role.
@@ -91,6 +107,8 @@ export interface ParticipantDto {
   id: string;
   userId: number | null;
   name: string;
+  gender: Gender | null;
+  isAdmin: boolean;
   addedByUserId: number;
   addedByName: string;
   isSelf: boolean;
@@ -101,6 +119,8 @@ export interface ParticipantDto {
 export interface WaitlistEntryDto {
   userId: number;
   name: string;
+  gender: Gender | null;
+  isAdmin: boolean;
   isSelf: boolean;
   createdAt: string;
 }

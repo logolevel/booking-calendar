@@ -197,15 +197,15 @@ export class ParticipationService {
     });
 
     // Notifications only after a successful commit.
-    const names = await this.users.getNameMap([actorId, targetUserId]);
+    const profiles = await this.users.getProfileMap([actorId, targetUserId]);
     const label = await this.eventLabel(eventId);
-    const actorName = names.get(actorId) ?? 'Учасник';
+    const actorName = profiles.get(actorId)?.name ?? 'Учасник';
     await this.telegram.notifyUser(
       targetUserId,
       `Вас додав(ла) ${actorName} на ${label}`,
     );
     if (role !== Role.admin) {
-      const targetName = names.get(targetUserId) ?? 'учасника';
+      const targetName = profiles.get(targetUserId)?.name ?? 'учасника';
       await this.telegram.notifyAdmin(
         `${actorName} додав(ла) ${targetName} на ${label}`,
       );
@@ -362,8 +362,9 @@ export class ParticipationService {
       ids.push(Number(l.actorUserId));
       if (l.targetUserId != null) ids.push(Number(l.targetUserId));
     }
-    const names = await this.users.getNameMap(ids);
-    const nameOf = (id: number): string => names.get(id) ?? 'Користувач';
+    const profiles = await this.users.getProfileMap(ids);
+    const nameOf = (id: number): string =>
+      profiles.get(id)?.name ?? 'Користувач';
 
     const actor = BigInt(actorId);
     const count = participants.length;
@@ -388,6 +389,8 @@ export class ParticipationService {
       canAddPlusOne,
       participants: participants.map((p) => {
         const isSelf = p.userId != null && p.userId === actor;
+        const profile =
+          p.userId != null ? profiles.get(Number(p.userId)) : undefined;
         return {
           id: p.id,
           userId: p.userId != null ? Number(p.userId) : null,
@@ -395,6 +398,8 @@ export class ParticipationService {
             p.userId != null
               ? nameOf(Number(p.userId))
               : p.guestName ?? 'Гість',
+          gender: profile?.gender ?? null,
+          isAdmin: profile?.isAdmin ?? false,
           addedByUserId: Number(p.addedByUserId),
           addedByName: nameOf(Number(p.addedByUserId)),
           isSelf,
@@ -402,12 +407,17 @@ export class ParticipationService {
           joinedAt: p.joinedAt.toISOString(),
         };
       }),
-      waitlist: waitlist.map((w) => ({
-        userId: Number(w.userId),
-        name: nameOf(Number(w.userId)),
-        isSelf: w.userId === actor,
-        createdAt: w.createdAt.toISOString(),
-      })),
+      waitlist: waitlist.map((w) => {
+        const profile = profiles.get(Number(w.userId));
+        return {
+          userId: Number(w.userId),
+          name: nameOf(Number(w.userId)),
+          gender: profile?.gender ?? null,
+          isAdmin: profile?.isAdmin ?? false,
+          isSelf: w.userId === actor,
+          createdAt: w.createdAt.toISOString(),
+        };
+      }),
       log: logs.map((l) => ({
         id: l.id,
         action: l.action as ParticipationAction,
