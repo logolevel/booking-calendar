@@ -50,17 +50,61 @@ model Setting {
 }
 
 model Event {
-  id         String    @id @default(uuid())
-  type       EventType
-  resourceId Int
-  title      String?
-  capacity   Int       @default(6)
-  startsAt   DateTime
-  endsAt     DateTime
-  createdBy  BigInt
-  author     User      @relation(fields: [createdBy], references: [id])
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id           String                  @id @default(uuid())
+  type         EventType
+  resourceId   Int
+  title        String?
+  capacity     Int                     @default(6)
+  startsAt     DateTime
+  endsAt       DateTime
+  createdBy    BigInt
+  author       User                    @relation(fields: [createdBy], references: [id])
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  participants EventParticipant[]
+  waitlist     EventWaitlist[]
+  logs         EventParticipationLog[]
 
   @@index([startsAt])
+}
+
+// A participant is either an app user (userId) or an outside guest (guestName).
+// addedByUserId records who added them (self or a +1).
+model EventParticipant {
+  id            String   @id @default(uuid())
+  eventId       String
+  userId        BigInt?
+  guestName     String?
+  addedByUserId BigInt
+  joinedAt      DateTime @default(now())
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+// FIFO waiting list; a user gets auto-promoted when a slot frees up.
+model EventWaitlist {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    BigInt
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId, createdAt])
+}
+
+// Audit trail of who did what to whom (join/add/leave/remove/promoted).
+model EventParticipationLog {
+  id              String   @id @default(uuid())
+  eventId         String
+  actorUserId     BigInt
+  targetUserId    BigInt?
+  targetGuestName String?
+  action          String
+  at              DateTime @default(now())
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, at])
 }

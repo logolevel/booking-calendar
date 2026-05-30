@@ -6,7 +6,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import type { EventDto, ResourceId } from '@tg-calendar/shared-types';
+import {
+  PARTICIPATION_ACTION,
+  type EventDto,
+  type ResourceId,
+} from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import type { CreateEventDto } from './dto/create-event.dto';
@@ -65,6 +69,24 @@ export class EventsService {
         createdBy: BigInt(userId),
       },
     });
+
+    // The creator automatically becomes the first participant.
+    await this.prisma.eventParticipant.create({
+      data: {
+        eventId: event.id,
+        userId: BigInt(userId),
+        addedByUserId: BigInt(userId),
+      },
+    });
+    await this.prisma.eventParticipationLog.create({
+      data: {
+        eventId: event.id,
+        actorUserId: BigInt(userId),
+        targetUserId: BigInt(userId),
+        action: PARTICIPATION_ACTION.JOIN,
+      },
+    });
+
     return this.toDto(event);
   }
 

@@ -75,3 +75,63 @@ export interface CreateEventRequest {
 }
 
 export type UpdateEventRequest = CreateEventRequest;
+
+export const PARTICIPATION_ACTION = {
+  JOIN: 'join',
+  ADD: 'add',
+  LEAVE: 'leave',
+  REMOVE: 'remove',
+  PROMOTED: 'promoted',
+} as const;
+
+export type ParticipationAction =
+  (typeof PARTICIPATION_ACTION)[keyof typeof PARTICIPATION_ACTION];
+
+export interface ParticipantDto {
+  id: string;
+  userId: number | null;
+  name: string;
+  addedByUserId: number;
+  addedByName: string;
+  isSelf: boolean;
+  canRemove: boolean;
+  joinedAt: string;
+}
+
+export interface WaitlistEntryDto {
+  userId: number;
+  name: string;
+  isSelf: boolean;
+  createdAt: string;
+}
+
+export interface ParticipationLogDto {
+  id: string;
+  action: ParticipationAction;
+  actorName: string;
+  targetName: string | null;
+  at: string;
+}
+
+export interface EventParticipantsResponse {
+  eventId: string;
+  capacity: number;
+  count: number;
+  isFull: boolean;
+  isParticipant: boolean;
+  isWaitlisted: boolean;
+  canAddPlusOne: boolean;
+  participants: ParticipantDto[];
+  waitlist: WaitlistEntryDto[];
+  log: ParticipationLogDto[];
+}
+
+export interface AddParticipantRequest {
+  userId: number;
+}
+
+export interface UserSearchResult {
+  id: number;
+  name: string;
+  username: string | null;
+}

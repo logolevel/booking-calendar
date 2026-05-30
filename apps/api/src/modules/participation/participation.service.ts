@@ -1,0 +1,369 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, Role } from '@prisma/client';
+import {
+  PARTICIPATION_ACTION,
+  type EventParticipantsResponse,
+  type ParticipationAction,
+} from '@tg-calendar/shared-types';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
+
+type Tx = Prisma.TransactionClient;
+
+@Injectable()
+export class ParticipationService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly users: UsersService,
+  ) {}
+
+  // Lock the event row for the duration of the transaction to avoid two
+  // clients grabbing the last seat at the same time.
+  private async lockEvent(tx: Tx, eventId: string): Promise<{ capacity: number }> {
+    const rows = await tx.$queryRaw<{ capacity: number }[]>`
+      SELECT "capacity" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
+    `;
+    const event = rows[0];
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+    return event;
+  }
+
+  private logAction(
+    tx: Tx,
+    eventId: string,
+    actorId: number,
+    action: ParticipationAction,
+    target?: { userId?: number | null; guestName?: string | null },
+  ): Promise<unknown> {
+    return tx.eventParticipationLog.create({
+      data: {
+        eventId,
+        actorUserId: BigInt(actorId),
+        action,
+        targetUserId:
+          target?.userId != null ? BigInt(target.userId) : null,
+        targetGuestName: target?.guestName ?? null,
+      },
+    });
+  }
+
+  private async promoteFromWaitlist(
+    tx: Tx,
+    eventId: string,
+    capacity: number,
+  ): Promise<void> {
+    const count = await tx.eventParticipant.count({ where: { eventId } });
+    if (count >= capacity) {
+      return;
+    }
+    const head = await tx.eventWaitlist.findFirst({
+      where: { eventId },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!head) {
+      return;
+    }
+    await tx.eventParticipant.create({
+      data: {
+        eventId,
+        userId: head.userId,
+        addedByUserId: head.userId,
+      },
+    });
+    await tx.eventWaitlist.delete({ where: { id: head.id } });
+    await this.logAction(tx, eventId, Number(head.userId), PARTICIPATION_ACTION.PROMOTED, {
+      userId: Number(head.userId),
+    });
+  }
+
+  async joinSelf(eventId: string, actorId: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      const existing = await tx.eventParticipant.findUnique({
+        where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+      });
+      if (existing) {
+        return;
+      }
+      const count = await tx.eventParticipant.count({ where: { eventId } });
+      if (count >= event.capacity) {
+        throw new ConflictException('Event is full');
+      }
+      await tx.eventParticipant.create({
+        data: {
+          eventId,
+          userId: BigInt(actorId),
+          addedByUserId: BigInt(actorId),
+        },
+      });
+      await tx.eventWaitlist.deleteMany({
+        where: { eventId, userId: BigInt(actorId) },
+      });
+      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.JOIN, {
+        userId: actorId,
+      });
+    });
+  }
+
+  async addParticipant(
+    eventId: string,
+    actorId: number,
+    role: Role,
+    targetUserId: number,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+
+      const target = await tx.user.findUnique({
+        where: { id: BigInt(targetUserId) },
+      });
+      if (!target) {
+        throw new BadRequestException('User not found');
+      }
+
+      const targetExisting = await tx.eventParticipant.findUnique({
+        where: { eventId_userId: { eventId, userId: BigInt(targetUserId) } },
+      });
+      if (targetExisting) {
+        throw new ConflictException('User is already a participant');
+      }
+
+      if (role !== Role.admin) {
+        const actorParticipant = await tx.eventParticipant.findUnique({
+          where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+        });
+        if (!actorParticipant) {
+          throw new ForbiddenException('Join the event before adding a guest');
+        }
+        const addedByActor = await tx.eventParticipant.count({
+          where: {
+            eventId,
+            addedByUserId: BigInt(actorId),
+            userId: { not: BigInt(actorId) },
+          },
+        });
+        if (addedByActor >= 1) {
+          throw new ForbiddenException('You can add only one extra participant');
+        }
+      }
+
+      const count = await tx.eventParticipant.count({ where: { eventId } });
+      if (count >= event.capacity) {
+        throw new ConflictException('Event is full');
+      }
+
+      await tx.eventParticipant.create({
+        data: {
+          eventId,
+          userId: BigInt(targetUserId),
+          addedByUserId: BigInt(actorId),
+        },
+      });
+      await tx.eventWaitlist.deleteMany({
+        where: { eventId, userId: BigInt(targetUserId) },
+      });
+      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.ADD, {
+        userId: targetUserId,
+      });
+    });
+  }
+
+  async removeParticipant(
+    eventId: string,
+    actorId: number,
+    role: Role,
+    participantId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      const participant = await tx.eventParticipant.findUnique({
+        where: { id: participantId },
+      });
+      if (!participant || participant.eventId !== eventId) {
+        throw new NotFoundException('Participant not found');
+      }
+
+      const isSelf =
+        participant.userId != null &&
+        participant.userId === BigInt(actorId);
+      const isOwner = participant.addedByUserId === BigInt(actorId);
+      if (role !== Role.admin && !isSelf && !isOwner) {
+        throw new ForbiddenException('You can remove only who you added');
+      }
+
+      await tx.eventParticipant.delete({ where: { id: participant.id } });
+      await this.logAction(
+        tx,
+        eventId,
+        actorId,
+        isSelf ? PARTICIPATION_ACTION.LEAVE : PARTICIPATION_ACTION.REMOVE,
+        {
+          userId: participant.userId != null ? Number(participant.userId) : null,
+          guestName: participant.guestName,
+        },
+      );
+      await this.promoteFromWaitlist(tx, eventId, event.capacity);
+    });
+  }
+
+  async leaveSelf(eventId: string, actorId: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      const mine = await tx.eventParticipant.findUnique({
+        where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+      });
+      if (mine) {
+        await tx.eventParticipant.delete({ where: { id: mine.id } });
+        await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.LEAVE, {
+          userId: actorId,
+        });
+        await this.promoteFromWaitlist(tx, eventId, event.capacity);
+        return;
+      }
+      await tx.eventWaitlist.deleteMany({
+        where: { eventId, userId: BigInt(actorId) },
+      });
+    });
+  }
+
+  async joinWaitlist(eventId: string, actorId: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      const existing = await tx.eventParticipant.findUnique({
+        where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+      });
+      if (existing) {
+        return;
+      }
+      const count = await tx.eventParticipant.count({ where: { eventId } });
+      if (count < event.capacity) {
+        // There is space — join directly instead of waiting.
+        await tx.eventParticipant.create({
+          data: {
+            eventId,
+            userId: BigInt(actorId),
+            addedByUserId: BigInt(actorId),
+          },
+        });
+        await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.JOIN, {
+          userId: actorId,
+        });
+        return;
+      }
+      await tx.eventWaitlist.upsert({
+        where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+        create: { eventId, userId: BigInt(actorId) },
+        update: {},
+      });
+    });
+  }
+
+  async leaveWaitlist(eventId: string, actorId: number): Promise<void> {
+    await this.prisma.eventWaitlist.deleteMany({
+      where: { eventId, userId: BigInt(actorId) },
+    });
+  }
+
+  async getDetails(
+    eventId: string,
+    actorId: number,
+    role: Role,
+  ): Promise<EventParticipantsResponse> {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    const [participants, waitlist, logs] = await Promise.all([
+      this.prisma.eventParticipant.findMany({
+        where: { eventId },
+        orderBy: { joinedAt: 'asc' },
+      }),
+      this.prisma.eventWaitlist.findMany({
+        where: { eventId },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.eventParticipationLog.findMany({
+        where: { eventId },
+        orderBy: { at: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    const ids: number[] = [];
+    for (const p of participants) {
+      if (p.userId != null) ids.push(Number(p.userId));
+      ids.push(Number(p.addedByUserId));
+    }
+    for (const w of waitlist) ids.push(Number(w.userId));
+    for (const l of logs) {
+      ids.push(Number(l.actorUserId));
+      if (l.targetUserId != null) ids.push(Number(l.targetUserId));
+    }
+    const names = await this.users.getNameMap(ids);
+    const nameOf = (id: number): string => names.get(id) ?? 'Користувач';
+
+    const actor = BigInt(actorId);
+    const count = participants.length;
+    const isParticipant = participants.some(
+      (p) => p.userId != null && p.userId === actor,
+    );
+    const isWaitlisted = waitlist.some((w) => w.userId === actor);
+    const addedByActor = participants.filter(
+      (p) => p.addedByUserId === actor && !(p.userId != null && p.userId === actor),
+    ).length;
+    const isFull = count >= event.capacity;
+    const canAddPlusOne =
+      !isFull && (role === Role.admin || (isParticipant && addedByActor < 1));
+
+    return {
+      eventId,
+      capacity: event.capacity,
+      count,
+      isFull,
+      isParticipant,
+      isWaitlisted,
+      canAddPlusOne,
+      participants: participants.map((p) => {
+        const isSelf = p.userId != null && p.userId === actor;
+        return {
+          id: p.id,
+          userId: p.userId != null ? Number(p.userId) : null,
+          name:
+            p.userId != null
+              ? nameOf(Number(p.userId))
+              : p.guestName ?? 'Гість',
+          addedByUserId: Number(p.addedByUserId),
+          addedByName: nameOf(Number(p.addedByUserId)),
+          isSelf,
+          canRemove: role === Role.admin || p.addedByUserId === actor || isSelf,
+          joinedAt: p.joinedAt.toISOString(),
+        };
+      }),
+      waitlist: waitlist.map((w) => ({
+        userId: Number(w.userId),
+        name: nameOf(Number(w.userId)),
+        isSelf: w.userId === actor,
+        createdAt: w.createdAt.toISOString(),
+      })),
+      log: logs.map((l) => ({
+        id: l.id,
+        action: l.action as ParticipationAction,
+        actorName: nameOf(Number(l.actorUserId)),
+        targetName:
+          l.targetUserId != null
+            ? nameOf(Number(l.targetUserId))
+            : l.targetGuestName,
+        at: l.at.toISOString(),
+      })),
+    };
+  }
+}

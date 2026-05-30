@@ -23,6 +23,7 @@ import { Sheet } from '../../../shared/ui/Sheet';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarDayHeader } from './CalendarDayHeader';
 import { EventForm } from './EventForm';
+import { ParticipantsPanel } from '../../participation/ui/ParticipantsPanel';
 
 const localizer = dateFnsLocalizer({
   format,
@@ -67,24 +68,35 @@ export function CalendarView({ role }: Props): JSX.Element {
   const [view, setView] = useState<View>(Views.WEEK);
   const [date, setDate] = useState<Date>(new Date());
   const [formOpen, setFormOpen] = useState<boolean>(false);
-  const [editEvent, setEditEvent] = useState<EventDto | null>(null);
+  const [activeEvent, setActiveEvent] = useState<EventDto | null>(null);
+  const [mode, setMode] = useState<'details' | 'edit' | 'create'>('create');
 
   const canCreate = role === ROLE.ADMIN || role === ROLE.MEMBER;
 
   const openCreate = (): void => {
-    setEditEvent(null);
+    setActiveEvent(null);
+    setMode('create');
     setFormOpen(true);
   };
 
-  const openEdit = (event: RbcEvent): void => {
-    setEditEvent(event.raw);
+  const openDetails = (event: RbcEvent): void => {
+    setActiveEvent(event.raw);
+    setMode('details');
     setFormOpen(true);
   };
 
   const closeForm = (): void => {
     setFormOpen(false);
-    setEditEvent(null);
+    setActiveEvent(null);
+    setMode('create');
   };
+
+  const sheetTitle =
+    mode === 'details'
+      ? 'Подія'
+      : mode === 'edit'
+        ? 'Редагувати подію'
+        : 'Нова подія';
 
   const events = useMemo<RbcEvent[]>(
     () => (data ?? []).map(toRbcEvent),
@@ -134,7 +146,7 @@ export function CalendarView({ role }: Props): JSX.Element {
         onView={setView}
         date={date}
         onNavigate={setDate}
-        onSelectEvent={openEdit}
+        onSelectEvent={openDetails}
         views={[Views.DAY, Views.WEEK, Views.AGENDA, Views.MONTH]}
         components={calendarComponents}
         min={new Date(1970, 0, 1, 8, 0, 0)}
@@ -161,11 +173,15 @@ export function CalendarView({ role }: Props): JSX.Element {
       )}
 
       {formOpen && (
-        <Sheet
-          title={editEvent ? 'Редагувати подію' : 'Нова подія'}
-          onClose={closeForm}
-        >
-          <EventForm event={editEvent ?? undefined} onClose={closeForm} />
+        <Sheet title={sheetTitle} onClose={closeForm}>
+          {mode === 'details' && activeEvent ? (
+            <ParticipantsPanel
+              event={activeEvent}
+              onEdit={() => setMode('edit')}
+            />
+          ) : (
+            <EventForm event={activeEvent ?? undefined} onClose={closeForm} />
+          )}
         </Sheet>
       )}
     </div>

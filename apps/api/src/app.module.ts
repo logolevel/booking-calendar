@@ -7,6 +7,8 @@ import { HealthController } from './health/health.controller';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { MeModule } from './modules/me/me.module';
 import { EventsModule } from './modules/events/events.module';
+import { UsersModule } from './modules/users/users.module';
+import { ParticipationModule } from './modules/participation/participation.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { EventsModule } from './modules/events/events.module';
     TelegramModule,
     MeModule,
     EventsModule,
+    UsersModule,
+    ParticipationModule,
   ],
   controllers: [HealthController],
 })
