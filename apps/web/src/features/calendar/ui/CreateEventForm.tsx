@@ -57,7 +57,15 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
   const [startTouched, setStartTouched] = useState<boolean>(false);
   const createEvent = useCreateEvent();
 
+  // Drop a stale submit error as soon as the user changes anything.
+  const clearError = (): void => {
+    if (createEvent.isError) {
+      createEvent.reset();
+    }
+  };
+
   const onStartChange = (value: string): void => {
+    clearError();
     setStartsAt(value);
     setStartTouched(true);
     // Each start change re-suggests start + 2h; the user may then adjust it.
@@ -75,6 +83,7 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
   };
 
   const onEndChange = (value: string): void => {
+    clearError();
     setEndsAt(value);
   };
 
@@ -107,7 +116,10 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <span className="field__label">Тип</span>
         <select
           value={type}
-          onChange={(e) => setType(e.target.value as EventType)}
+          onChange={(e) => {
+            clearError();
+            setType(e.target.value as EventType);
+          }}
         >
           {EVENT_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -121,7 +133,10 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <span className="field__label">Площадка</span>
         <select
           value={resourceId}
-          onChange={(e) => setResourceId(Number(e.target.value) as ResourceId)}
+          onChange={(e) => {
+            clearError();
+            setResourceId(Number(e.target.value) as ResourceId);
+          }}
         >
           {RESOURCE_IDS.map((id) => (
             <option key={id} value={id}>
@@ -135,7 +150,10 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <span className="field__label">Ліміт учасників</span>
         <select
           value={capacity}
-          onChange={(e) => setCapacity(Number(e.target.value))}
+          onChange={(e) => {
+            clearError();
+            setCapacity(Number(e.target.value));
+          }}
         >
           {CAPACITY_OPTIONS.map((n) => (
             <option key={n} value={n}>
