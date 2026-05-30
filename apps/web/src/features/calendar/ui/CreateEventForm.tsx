@@ -23,6 +23,13 @@ const CAPACITY_OPTIONS = Array.from(
 const DEFAULT_DURATION_HOURS = 2;
 const LOCAL_PATTERN = "yyyy-MM-dd'T'HH:mm";
 
+// Current time rounded down to the start of the hour (:00).
+function currentHour(): string {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  return format(d, LOCAL_PATTERN);
+}
+
 function addHours(value: string, hours: number): string {
   if (!value) {
     return '';
@@ -43,22 +50,21 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
   const [type, setType] = useState<EventType>(EVENT_TYPE.MIXED);
   const [resourceId, setResourceId] = useState<ResourceId>(RESOURCE_IDS[0]);
   const [capacity, setCapacity] = useState<number>(DEFAULT_CAPACITY);
-  const [startsAt, setStartsAt] = useState<string>('');
+  const [startsAt, setStartsAt] = useState<string>(currentHour);
   const [endsAt, setEndsAt] = useState<string>('');
-  // Once the user edits the end manually, stop auto-deriving it from the start.
-  const [endEdited, setEndEdited] = useState<boolean>(false);
+  // The end field stays disabled until the user actively sets the start.
+  const [startTouched, setStartTouched] = useState<boolean>(false);
   const createEvent = useCreateEvent();
 
   const onStartChange = (value: string): void => {
     setStartsAt(value);
-    if (!endEdited) {
-      setEndsAt(addHours(value, DEFAULT_DURATION_HOURS));
-    }
+    setStartTouched(true);
+    // Each start change re-suggests start + 2h; the user may then adjust it.
+    setEndsAt(addHours(value, DEFAULT_DURATION_HOURS));
   };
 
   const onEndChange = (value: string): void => {
     setEndsAt(value);
-    setEndEdited(true);
   };
 
   const submit = (e: FormEvent): void => {
@@ -136,7 +142,7 @@ export function CreateEventForm({ onClose }: Props): JSX.Element {
         <input
           type="datetime-local"
           value={endsAt}
-          disabled={!startsAt}
+          disabled={!startTouched}
           onChange={(e) => onEndChange(e.target.value)}
         />
       </label>
