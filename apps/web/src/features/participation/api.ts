@@ -1,5 +1,7 @@
 import type {
+  CreateGuestRequest,
   EventParticipantsResponse,
+  GuestDto,
   UserSearchResult,
 } from '@tg-calendar/shared-types';
 import {
@@ -68,5 +70,29 @@ export function leaveWaitlist(
 export function searchUsers(q: string): Promise<UserSearchResult[]> {
   return apiGet<UserSearchResult[]>(
     `/api/users/search?q=${encodeURIComponent(q)}`,
+  );
+}
+
+export function searchGuests(q: string): Promise<GuestDto[]> {
+  return apiGet<GuestDto[]>(`/api/guests/search?q=${encodeURIComponent(q)}`);
+}
+
+export function addExistingGuest(
+  eventId: string,
+  guestId: string,
+): Promise<EventParticipantsResponse> {
+  return apiPost<EventParticipantsResponse>(
+    `/api/events/${eventId}/participants/guest`,
+    { guestId },
+  );
+}
+
+export function createGuest(
+  eventId: string,
+  guest: CreateGuestRequest,
+): Promise<EventParticipantsResponse> {
+  return apiPost<EventParticipantsResponse>(
+    `/api/events/${eventId}/participants/guest/new`,
+    guest,
   );
 }

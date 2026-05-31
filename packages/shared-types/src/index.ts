@@ -113,9 +113,12 @@ export type ParticipationAction =
 export interface ParticipantDto {
   id: string;
   userId: number | null;
+  // Set for an outside guest (no Telegram account, not in the directory).
+  guestId: string | null;
   name: string;
   gender: Gender | null;
   isAdmin: boolean;
+  isGuest: boolean;
   addedByUserId: number;
   addedByName: string;
   isSelf: boolean;
@@ -161,4 +164,21 @@ export interface UserSearchResult {
   id: number;
   name: string;
   username: string | null;
+}
+
+// Reusable outside guest (not part of the group directory).
+export interface GuestDto {
+  id: string;
+  name: string;
+  gender: Gender;
+}
+
+export interface CreateGuestRequest {
+  firstName: string;
+  lastName: string;
+  gender: Gender;
+}
+
+export interface AddExistingGuestRequest {
+  guestId: string;
 }

@@ -8,6 +8,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
 import { MeModule } from './modules/me/me.module';
 import { EventsModule } from './modules/events/events.module';
 import { UsersModule } from './modules/users/users.module';
+import { GuestsModule } from './modules/guests/guests.module';
 import { ParticipationModule } from './modules/participation/participation.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { ParticipationModule } from './modules/participation/participation.modul
     MeModule,
     EventsModule,
     UsersModule,
+    GuestsModule,
     ParticipationModule,
   ],
   controllers: [HealthController],

@@ -79,19 +79,34 @@ model Event {
   @@index([startsAt])
 }
 
-// A participant is either an app user (userId) or an outside guest (guestName).
+// Reusable outside guest, kept apart from the group user directory.
+model Guest {
+  id           String             @id @default(uuid())
+  firstName    String
+  lastName     String
+  gender       Gender
+  createdBy    BigInt
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  participants EventParticipant[]
+
+  @@index([lastName, firstName])
+}
+
+// A participant is either an app user (userId) or a reusable guest (guestId).
 // addedByUserId records who added them (self or a +1).
 model EventParticipant {
   id            String   @id @default(uuid())
   eventId       String
   userId        BigInt?
-  guestName     String?
-  guestPhone    String?
+  guestId       String?
   addedByUserId BigInt
   joinedAt      DateTime @default(now())
   event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest         Guest?   @relation(fields: [guestId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+  @@unique([eventId, guestId])
   @@index([eventId])
 }
 

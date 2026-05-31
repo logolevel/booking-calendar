@@ -13,6 +13,7 @@ import {
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { GuestsService } from '../guests/guests.service';
 import { TelegramService } from '../telegram/telegram.service';
 
 type Tx = Prisma.TransactionClient;
@@ -22,6 +23,7 @@ export class ParticipationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly guests: GuestsService,
     private readonly telegram: TelegramService,
   ) {}
 
@@ -212,6 +214,93 @@ export class ParticipationService {
     }
   }
 
+  // Shared "+1" rule: non-admins must already be in and may add one extra
+  // (a directory user or a guest); everyone is bound by the capacity.
+  private async assertCanAddExtra(
+    tx: Tx,
+    eventId: string,
+    actorId: number,
+    role: Role,
+    capacity: number,
+  ): Promise<void> {
+    if (role !== Role.admin) {
+      const actorParticipant = await tx.eventParticipant.findUnique({
+        where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+      });
+      if (!actorParticipant) {
+        throw new ForbiddenException('Join the event before adding a guest');
+      }
+      const extras = await tx.eventParticipant.count({
+        where: {
+          eventId,
+          addedByUserId: BigInt(actorId),
+          OR: [{ userId: null }, { userId: { not: BigInt(actorId) } }],
+        },
+      });
+      if (extras >= 1) {
+        throw new ForbiddenException('You can add only one extra participant');
+      }
+    }
+    const count = await tx.eventParticipant.count({ where: { eventId } });
+    if (count >= capacity) {
+      throw new ConflictException('Event is full');
+    }
+  }
+
+  async addExistingGuest(
+    eventId: string,
+    actorId: number,
+    role: Role,
+    guestId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      const guest = await tx.guest.findUnique({ where: { id: guestId } });
+      if (!guest) {
+        throw new BadRequestException('Guest not found');
+      }
+      const existing = await tx.eventParticipant.findUnique({
+        where: { eventId_guestId: { eventId, guestId } },
+      });
+      if (existing) {
+        throw new ConflictException('Guest is already a participant');
+      }
+      await this.assertCanAddExtra(tx, eventId, actorId, role, event.capacity);
+      await tx.eventParticipant.create({
+        data: { eventId, guestId, addedByUserId: BigInt(actorId) },
+      });
+      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.ADD, {
+        guestName: this.guests.displayName(guest),
+      });
+    });
+  }
+
+  async createAndAddGuest(
+    eventId: string,
+    actorId: number,
+    role: Role,
+    input: { firstName: string; lastName: string; gender: Prisma.GuestCreateInput['gender'] },
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      await this.assertCanAddExtra(tx, eventId, actorId, role, event.capacity);
+      const guest = await tx.guest.create({
+        data: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          gender: input.gender,
+          createdBy: BigInt(actorId),
+        },
+      });
+      await tx.eventParticipant.create({
+        data: { eventId, guestId: guest.id, addedByUserId: BigInt(actorId) },
+      });
+      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.ADD, {
+        guestName: this.guests.displayName(guest),
+      });
+    });
+  }
+
   async removeParticipant(
     eventId: string,
     actorId: number,
@@ -235,6 +324,10 @@ export class ParticipationService {
         throw new ForbiddenException('You can remove only who you added');
       }
 
+      const guest = participant.guestId
+        ? await tx.guest.findUnique({ where: { id: participant.guestId } })
+        : null;
+
       await tx.eventParticipant.delete({ where: { id: participant.id } });
       await this.logAction(
         tx,
@@ -243,7 +336,7 @@ export class ParticipationService {
         isSelf ? PARTICIPATION_ACTION.LEAVE : PARTICIPATION_ACTION.REMOVE,
         {
           userId: participant.userId != null ? Number(participant.userId) : null,
-          guestName: participant.guestName,
+          guestName: guest ? this.guests.displayName(guest) : null,
         },
       );
       return this.promoteFromWaitlist(tx, eventId, event.capacity);
@@ -353,8 +446,10 @@ export class ParticipationService {
     ]);
 
     const ids: number[] = [];
+    const guestIds: string[] = [];
     for (const p of participants) {
       if (p.userId != null) ids.push(Number(p.userId));
+      if (p.guestId != null) guestIds.push(p.guestId);
       ids.push(Number(p.addedByUserId));
     }
     for (const w of waitlist) ids.push(Number(w.userId));
@@ -362,7 +457,10 @@ export class ParticipationService {
       ids.push(Number(l.actorUserId));
       if (l.targetUserId != null) ids.push(Number(l.targetUserId));
     }
-    const profiles = await this.users.getProfileMap(ids);
+    const [profiles, guestProfiles] = await Promise.all([
+      this.users.getProfileMap(ids),
+      this.guests.getMap(guestIds),
+    ]);
     const nameOf = (id: number): string =>
       profiles.get(id)?.name ?? 'Користувач';
 
@@ -391,15 +489,19 @@ export class ParticipationService {
         const isSelf = p.userId != null && p.userId === actor;
         const profile =
           p.userId != null ? profiles.get(Number(p.userId)) : undefined;
+        const guest =
+          p.guestId != null ? guestProfiles.get(p.guestId) : undefined;
         return {
           id: p.id,
           userId: p.userId != null ? Number(p.userId) : null,
+          guestId: p.guestId,
           name:
             p.userId != null
               ? nameOf(Number(p.userId))
-              : p.guestName ?? 'Гість',
-          gender: profile?.gender ?? null,
+              : guest?.name ?? 'Гість',
+          gender: profile?.gender ?? guest?.gender ?? null,
           isAdmin: profile?.isAdmin ?? false,
+          isGuest: p.guestId != null,
           addedByUserId: Number(p.addedByUserId),
           addedByName: nameOf(Number(p.addedByUserId)),
           isSelf,

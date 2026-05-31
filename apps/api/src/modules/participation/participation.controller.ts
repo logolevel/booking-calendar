@@ -21,6 +21,7 @@ import { AccessService } from '../access/access.service';
 import { EventsGateway } from '../realtime/events.gateway';
 import { ParticipationService } from './participation.service';
 import { AddParticipantDto } from './dto/add-participant.dto';
+import { AddExistingGuestDto, CreateGuestDto } from './dto/add-guest.dto';
 
 @Controller('api/events/:eventId')
 @UseGuards(TelegramAuthGuard)
@@ -74,6 +75,41 @@ export class ParticipationController {
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
     await this.participation.addParticipant(eventId, user.id, role, dto.userId);
+    this.gateway.emitEventUpdate(eventId);
+    return this.participation.getDetails(eventId, user.id, role);
+  }
+
+  @Post('participants/guest')
+  async addExistingGuest(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('eventId') eventId: string,
+    @Body() dto: AddExistingGuestDto,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
+  ): Promise<EventParticipantsResponse> {
+    const role = await this.resolveRole(user.id, preview);
+    await this.participation.addExistingGuest(
+      eventId,
+      user.id,
+      role,
+      dto.guestId,
+    );
+    this.gateway.emitEventUpdate(eventId);
+    return this.participation.getDetails(eventId, user.id, role);
+  }
+
+  @Post('participants/guest/new')
+  async createGuest(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('eventId') eventId: string,
+    @Body() dto: CreateGuestDto,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
+  ): Promise<EventParticipantsResponse> {
+    const role = await this.resolveRole(user.id, preview);
+    await this.participation.createAndAddGuest(eventId, user.id, role, {
+      firstName: dto.firstName.trim(),
+      lastName: dto.lastName.trim(),
+      gender: dto.gender,
+    });
     this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }

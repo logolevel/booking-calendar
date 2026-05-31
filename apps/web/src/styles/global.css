@@ -671,6 +671,25 @@ button {
   font-weight: 600;
 }
 
+.participants__group {
+  margin-top: 14px;
+}
+
+.participants__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.participants__group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .participants__section {
   margin-top: 16px;
 }

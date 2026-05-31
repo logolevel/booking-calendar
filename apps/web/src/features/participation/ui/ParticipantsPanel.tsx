@@ -15,6 +15,7 @@ import {
   useUserSearch,
 } from '../useParticipation';
 import { useEventRealtime } from '../useEventRealtime';
+import { AddGuest } from './AddGuest';
 
 const RESOURCE_COLOR: Record<number, string> = {
   1: 'var(--resource-1)',
@@ -111,6 +112,11 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
       .map((p) => p.userId)
       .filter((id): id is number => id != null),
   );
+  const existingGuestIds = new Set(
+    (data?.participants ?? [])
+      .map((p) => p.guestId)
+      .filter((id): id is string => id != null),
+  );
   const searchResults = (search.data ?? []).filter(
     (u) => !existingIds.has(u.id),
   );
@@ -172,6 +178,9 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
                     isUser={p.userId != null}
                   />
                   {p.isSelf && <span className="participants__you"> (ви)</span>}
+                  {p.isGuest && (
+                    <span className="participants__by"> · гість</span>
+                  )}
                   {p.userId !== p.addedByUserId && (
                     <span className="participants__by">
                       {' '}
@@ -233,6 +242,10 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
                 </ul>
               )}
             </div>
+          )}
+
+          {data.canAddPlusOne && (
+            <AddGuest actions={actions} existingGuestIds={existingGuestIds} />
           )}
 
           {data.waitlist.length > 0 && (
