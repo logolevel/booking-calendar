@@ -15,7 +15,6 @@ import { eventTypeLabel } from '../eventLabels';
 import { ApiError } from '../../../shared/api/client';
 import { Button } from '../../../shared/ui/Button';
 
-const EVENT_TYPES = Object.values(EVENT_TYPE);
 const CAPACITY_OPTIONS = Array.from(
   { length: MAX_CAPACITY - MIN_CAPACITY + 1 },
   (_, i) => MIN_CAPACITY + i,
@@ -50,10 +49,11 @@ function addHours(value: string, hours: number): string {
 
 interface Props {
   event?: EventDto;
+  isAdmin: boolean;
   onClose: () => void;
 }
 
-export function EventForm({ event, onClose }: Props): JSX.Element {
+export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
   const isEdit = Boolean(event);
   const [type, setType] = useState<EventType>(event?.type ?? EVENT_TYPE.MIXED);
   const [resourceId, setResourceId] = useState<ResourceId>(
@@ -61,6 +61,18 @@ export function EventForm({ event, onClose }: Props): JSX.Element {
   );
   const [capacity, setCapacity] = useState<number>(
     event?.capacity ?? DEFAULT_CAPACITY,
+  );
+  const [organizerName, setOrganizerName] = useState<string>(
+    event?.organizerName ?? '',
+  );
+  const [organizerPhone, setOrganizerPhone] = useState<string>(
+    event?.organizerPhone ?? '',
+  );
+
+  const isGroup = type === EVENT_TYPE.GROUP;
+  // The group type is admin-only, but keep it available when editing one.
+  const typeOptions = Object.values(EVENT_TYPE).filter(
+    (t) => t !== EVENT_TYPE.GROUP || isAdmin || event?.type === EVENT_TYPE.GROUP,
   );
   const [startsAt, setStartsAt] = useState<string>(
     event ? toLocalInput(event.startsAt) : currentHour(),
@@ -111,16 +123,25 @@ export function EventForm({ event, onClose }: Props): JSX.Element {
       : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
     : null;
 
+  const canSubmit =
+    Boolean(startsAt) &&
+    Boolean(endsAt) &&
+    (!isGroup || organizerName.trim().length > 0);
+
   const submit = (e: FormEvent): void => {
     e.preventDefault();
-    if (!startsAt || !endsAt) {
+    if (!canSubmit) {
       return;
     }
     const body = {
       type,
       resourceId,
-      capacity,
+      // Group bookings have no sign-up list; capacity is irrelevant.
+      capacity: isGroup ? MIN_CAPACITY : capacity,
       title: event?.title ?? undefined,
+      organizerName: isGroup ? organizerName.trim() : undefined,
+      organizerPhone:
+        isGroup && organizerPhone.trim() ? organizerPhone.trim() : undefined,
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
     };
@@ -142,7 +163,7 @@ export function EventForm({ event, onClose }: Props): JSX.Element {
             setType(e.target.value as EventType);
           }}
         >
-          {EVENT_TYPES.map((t) => (
+          {typeOptions.map((t) => (
             <option key={t} value={t}>
               {eventTypeLabel(t)}
             </option>
@@ -167,22 +188,51 @@ export function EventForm({ event, onClose }: Props): JSX.Element {
         </select>
       </label>
 
-      <label className="field">
-        <span className="field__label">Ліміт учасників</span>
-        <select
-          value={capacity}
-          onChange={(e) => {
-            clearError();
-            setCapacity(Number(e.target.value));
-          }}
-        >
-          {CAPACITY_OPTIONS.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </label>
+      {isGroup ? (
+        <>
+          <label className="field">
+            <span className="field__label">Ім'я організатора</span>
+            <input
+              type="text"
+              value={organizerName}
+              onChange={(e) => {
+                clearError();
+                setOrganizerName(e.target.value);
+              }}
+            />
+          </label>
+
+          <label className="field">
+            <span className="field__label">Номер телефону (необов'язково)</span>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={organizerPhone}
+              onChange={(e) => {
+                clearError();
+                setOrganizerPhone(e.target.value);
+              }}
+            />
+          </label>
+        </>
+      ) : (
+        <label className="field">
+          <span className="field__label">Ліміт учасників</span>
+          <select
+            value={capacity}
+            onChange={(e) => {
+              clearError();
+              setCapacity(Number(e.target.value));
+            }}
+          >
+            {CAPACITY_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="field">
         <span className="field__label">Початок</span>
@@ -210,11 +260,7 @@ export function EventForm({ event, onClose }: Props): JSX.Element {
         <Button variant="secondary" block onClick={onClose}>
           Скасувати
         </Button>
-        <Button
-          type="submit"
-          block
-          disabled={mutation.isPending || !startsAt || !endsAt}
-        >
+        <Button type="submit" block disabled={mutation.isPending || !canSubmit}>
           Зберегти
         </Button>
       </div>

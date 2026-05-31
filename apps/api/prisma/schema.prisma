@@ -20,6 +20,7 @@ enum EventType {
   individual
   tech_women
   tech_men
+  group
 }
 
 enum Gender {
@@ -57,14 +58,17 @@ model Setting {
 }
 
 model Event {
-  id           String                  @id @default(uuid())
-  type         EventType
-  resourceId   Int
-  title        String?
-  capacity     Int                     @default(6)
-  startsAt     DateTime
-  endsAt       DateTime
-  createdBy    BigInt
+  id             String                  @id @default(uuid())
+  type           EventType
+  resourceId     Int
+  title          String?
+  capacity       Int                     @default(6)
+  // Set only for `group` events: outside organizer contact details.
+  organizerName  String?
+  organizerPhone String?
+  startsAt       DateTime
+  endsAt         DateTime
+  createdBy      BigInt
   author       User                    @relation(fields: [createdBy], references: [id])
   createdAt    DateTime                @default(now())
   updatedAt    DateTime                @updatedAt

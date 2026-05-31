@@ -39,17 +39,6 @@ export function addParticipant(
   );
 }
 
-export function addGuest(
-  eventId: string,
-  name: string,
-  phone: string,
-): Promise<EventParticipantsResponse> {
-  return apiPost<EventParticipantsResponse>(
-    `/api/events/${eventId}/participants/guest`,
-    { name, phone },
-  );
-}
-
 export function removeParticipant(
   eventId: string,
   participantId: string,

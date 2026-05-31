@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -35,6 +36,18 @@ export class CreateEventDto {
   @Min(MIN_CAPACITY)
   @Max(MAX_CAPACITY)
   capacity!: number;
+
+  // Group events only: organizer name and optional contact phone.
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  organizerName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  @Matches(/^[+()\d\s-]+$/, { message: 'phone must be a valid number' })
+  organizerPhone?: string;
 
   @IsISO8601()
   startsAt!: string;

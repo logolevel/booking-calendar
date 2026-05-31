@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import {
+  EVENT_TYPE,
   PARTICIPATION_ACTION,
   type EventDto,
   type ResourceId,
@@ -21,6 +22,8 @@ interface EventRow {
   resourceId: number;
   title: string | null;
   capacity: number;
+  organizerName: string | null;
+  organizerPhone: string | null;
   startsAt: Date;
   endsAt: Date;
   createdBy: bigint;
@@ -52,6 +55,11 @@ export class EventsService {
       throw new BadRequestException('endsAt must be after startsAt');
     }
 
+    const isGroup = dto.type === EVENT_TYPE.GROUP;
+    if (isGroup && role !== Role.admin) {
+      throw new ForbiddenException('Only an admin can create a group booking');
+    }
+
     if (role !== Role.admin) {
       await this.assertWithinDateLimit(startsAt);
     }
@@ -64,28 +72,32 @@ export class EventsService {
         resourceId: dto.resourceId,
         title: dto.title ?? null,
         capacity: dto.capacity,
+        organizerName: isGroup ? dto.organizerName ?? null : null,
+        organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
         startsAt,
         endsAt,
         createdBy: BigInt(userId),
       },
     });
 
-    // The creator automatically becomes the first participant.
-    await this.prisma.eventParticipant.create({
-      data: {
-        eventId: event.id,
-        userId: BigInt(userId),
-        addedByUserId: BigInt(userId),
-      },
-    });
-    await this.prisma.eventParticipationLog.create({
-      data: {
-        eventId: event.id,
-        actorUserId: BigInt(userId),
-        targetUserId: BigInt(userId),
-        action: PARTICIPATION_ACTION.JOIN,
-      },
-    });
+    // Group bookings have no sign-up list, so the admin does not auto-join.
+    if (!isGroup) {
+      await this.prisma.eventParticipant.create({
+        data: {
+          eventId: event.id,
+          userId: BigInt(userId),
+          addedByUserId: BigInt(userId),
+        },
+      });
+      await this.prisma.eventParticipationLog.create({
+        data: {
+          eventId: event.id,
+          actorUserId: BigInt(userId),
+          targetUserId: BigInt(userId),
+          action: PARTICIPATION_ACTION.JOIN,
+        },
+      });
+    }
 
     return this.toDto(event);
   }
@@ -106,6 +118,11 @@ export class EventsService {
       throw new BadRequestException('endsAt must be after startsAt');
     }
 
+    const isGroup = dto.type === EVENT_TYPE.GROUP;
+    if (isGroup && role !== Role.admin) {
+      throw new ForbiddenException('Only an admin can manage a group booking');
+    }
+
     if (role !== Role.admin) {
       await this.assertWithinDateLimit(startsAt);
     }
@@ -119,6 +136,8 @@ export class EventsService {
         resourceId: dto.resourceId,
         title: dto.title ?? null,
         capacity: dto.capacity,
+        organizerName: isGroup ? dto.organizerName ?? null : null,
+        organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
         startsAt,
         endsAt,
       },
@@ -172,6 +191,8 @@ export class EventsService {
       resourceId: event.resourceId as ResourceId,
       title: event.title,
       capacity: event.capacity,
+      organizerName: event.organizerName,
+      organizerPhone: event.organizerPhone,
       startsAt: event.startsAt.toISOString(),
       endsAt: event.endsAt.toISOString(),
       createdBy: Number(event.createdBy),

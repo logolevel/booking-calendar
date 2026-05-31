@@ -232,7 +232,11 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
               onEdit={() => setMode('edit')}
             />
           ) : (
-            <EventForm event={activeEvent ?? undefined} onClose={closeForm} />
+            <EventForm
+              event={activeEvent ?? undefined}
+              isAdmin={isAdmin}
+              onClose={closeForm}
+            />
           )}
         </Sheet>
       )}

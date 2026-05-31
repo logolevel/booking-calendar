@@ -659,23 +659,16 @@ button {
   margin-top: 2px;
 }
 
-.participants__group {
-  margin-top: 14px;
+.participants__organizer {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card-muted, rgba(127, 127, 127, 0.08));
 }
 
-.participants__checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
+.participants__organizer-name {
+  font-size: 16px;
   font-weight: 600;
-}
-
-.participants__group-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
 }
 
 .participants__section {

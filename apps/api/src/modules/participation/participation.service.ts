@@ -212,38 +212,6 @@ export class ParticipationService {
     }
   }
 
-  // Admin-only: register an outside person/group with a contact phone.
-  // These entries are not added to the user directory.
-  async addGuest(
-    eventId: string,
-    actorId: number,
-    role: Role,
-    name: string,
-    phone: string,
-  ): Promise<void> {
-    if (role !== Role.admin) {
-      throw new ForbiddenException('Only an admin can add a group');
-    }
-    await this.prisma.$transaction(async (tx) => {
-      const event = await this.lockEvent(tx, eventId);
-      const count = await tx.eventParticipant.count({ where: { eventId } });
-      if (count >= event.capacity) {
-        throw new ConflictException('Event is full');
-      }
-      await tx.eventParticipant.create({
-        data: {
-          eventId,
-          guestName: name,
-          guestPhone: phone,
-          addedByUserId: BigInt(actorId),
-        },
-      });
-      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.ADD, {
-        guestName: name,
-      });
-    });
-  }
-
   async removeParticipant(
     eventId: string,
     actorId: number,
@@ -410,8 +378,6 @@ export class ParticipationService {
     const isFull = count >= event.capacity;
     const canAddPlusOne =
       !isFull && (role === Role.admin || (isParticipant && addedByActor < 1));
-    const isAdmin = role === Role.admin;
-    const canAddGuest = isAdmin && !isFull;
 
     return {
       eventId,
@@ -421,7 +387,6 @@ export class ParticipationService {
       isParticipant,
       isWaitlisted,
       canAddPlusOne,
-      canAddGuest,
       participants: participants.map((p) => {
         const isSelf = p.userId != null && p.userId === actor;
         const profile =
@@ -435,8 +400,6 @@ export class ParticipationService {
               : p.guestName ?? 'Гість',
           gender: profile?.gender ?? null,
           isAdmin: profile?.isAdmin ?? false,
-          // Guest contact phone, visible to everyone so they can reach them.
-          phone: p.guestPhone,
           addedByUserId: Number(p.addedByUserId),
           addedByName: nameOf(Number(p.addedByUserId)),
           isSelf,

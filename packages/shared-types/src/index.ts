@@ -20,6 +20,8 @@ export const EVENT_TYPE = {
   INDIVIDUAL: 'individual',
   TECH_WOMEN: 'tech_women',
   TECH_MEN: 'tech_men',
+  // Outside group booking (admin-only): no sign-up list, just an organizer.
+  GROUP: 'group',
 } as const;
 
 export type EventType = (typeof EVENT_TYPE)[keyof typeof EVENT_TYPE];
@@ -76,6 +78,9 @@ export interface EventDto {
   resourceId: ResourceId;
   title: string | null;
   capacity: number;
+  // Group events only: organizer name and optional contact phone.
+  organizerName: string | null;
+  organizerPhone: string | null;
   startsAt: string;
   endsAt: string;
   createdBy: number;
@@ -86,6 +91,8 @@ export interface CreateEventRequest {
   resourceId: ResourceId;
   title?: string;
   capacity: number;
+  organizerName?: string;
+  organizerPhone?: string;
   startsAt: string;
   endsAt: string;
 }
@@ -109,8 +116,6 @@ export interface ParticipantDto {
   name: string;
   gender: Gender | null;
   isAdmin: boolean;
-  // Guest/group entry: contact phone, visible to everyone.
-  phone: string | null;
   addedByUserId: number;
   addedByName: string;
   isSelf: boolean;
@@ -143,8 +148,6 @@ export interface EventParticipantsResponse {
   isParticipant: boolean;
   isWaitlisted: boolean;
   canAddPlusOne: boolean;
-  // Admin-only: add an outside person/group (kept off the user directory).
-  canAddGuest: boolean;
   participants: ParticipantDto[];
   waitlist: WaitlistEntryDto[];
   log: ParticipationLogDto[];
@@ -152,11 +155,6 @@ export interface EventParticipantsResponse {
 
 export interface AddParticipantRequest {
   userId: number;
-}
-
-export interface AddGuestRequest {
-  name: string;
-  phone: string;
 }
 
 export interface UserSearchResult {
