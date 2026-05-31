@@ -24,6 +24,7 @@ interface EventRow {
   capacity: number;
   organizerName: string | null;
   organizerPhone: string | null;
+  groupSize: number | null;
   startsAt: Date;
   endsAt: Date;
   createdBy: bigint;
@@ -88,6 +89,7 @@ export class EventsService {
         allowEmpty: isAdmin,
         organizerName: isGroup ? dto.organizerName ?? null : null,
         organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+        groupSize: isGroup ? dto.groupSize ?? null : null,
         startsAt,
         endsAt,
         createdBy: BigInt(userId),
@@ -168,6 +170,7 @@ export class EventsService {
         capacity: dto.capacity,
         organizerName: isGroup ? dto.organizerName ?? null : null,
         organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+        groupSize: isGroup ? dto.groupSize ?? null : null,
         startsAt,
         endsAt,
       },
@@ -228,6 +231,7 @@ export class EventsService {
       participantCount,
       organizerName: event.organizerName,
       organizerPhone: event.organizerPhone,
+      groupSize: event.groupSize,
       startsAt: event.startsAt.toISOString(),
       endsAt: event.endsAt.toISOString(),
       createdBy: Number(event.createdBy),

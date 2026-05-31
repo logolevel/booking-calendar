@@ -14,3 +14,13 @@ const LABELS: Record<EventType, string> = {
 export function eventTypeLabel(type: EventType): string {
   return LABELS[type];
 }
+
+// Courts are shown by colour name instead of a number.
+const RESOURCE_LABELS: Record<number, string> = {
+  1: 'Зелений',
+  2: 'Червоний',
+};
+
+export function resourceLabel(id: number): string {
+  return RESOURCE_LABELS[id] ?? `№${id}`;
+}

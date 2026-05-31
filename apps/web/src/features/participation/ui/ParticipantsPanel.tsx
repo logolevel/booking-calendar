@@ -6,7 +6,7 @@ import {
   type EventDto,
   type ParticipationLogDto,
 } from '@tg-calendar/shared-types';
-import { eventTypeLabel } from '../../calendar/eventLabels';
+import { eventTypeLabel, resourceLabel } from '../../calendar/eventLabels';
 import { Button } from '../../../shared/ui/Button';
 import { PersonName } from '../../../shared/ui/PersonName';
 import {
@@ -145,7 +145,7 @@ export function ParticipantsPanel({
         <div>
           <div className="participants__title">{title}</div>
           <div className="participants__time">
-            Площадка №{event.resourceId} ·{' '}
+            Майданчик {resourceLabel(event.resourceId)} ·{' '}
             {format(start, 'd MMM, HH:mm', { locale: uk })} –{' '}
             {format(end, 'HH:mm', { locale: uk })}
           </div>
@@ -158,6 +158,11 @@ export function ParticipantsPanel({
           <div className="participants__organizer-name">
             {event.organizerName ?? '—'}
           </div>
+          {event.groupSize != null && (
+            <div className="participants__time">
+              Кількість людей: {event.groupSize}
+            </div>
+          )}
           {event.organizerPhone && (
             <a
               className="participants__phone"

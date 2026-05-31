@@ -41,7 +41,8 @@ export class ParticipationService {
       minute: '2-digit',
     }).format(event.startsAt);
     const name = event.title ?? 'тренування';
-    return `${name} (${when}, площадка №${event.resourceId})`;
+    const court = event.resourceId === 1 ? 'Зелений' : 'Червоний';
+    return `${name} (${when}, майданчик ${court})`;
   }
 
   // Lock the event row for the duration of the transaction to avoid two

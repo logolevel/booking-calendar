@@ -80,9 +80,10 @@ export interface EventDto {
   capacity: number;
   // Current number of participants (used for the calendar fill indicator).
   participantCount: number;
-  // Group events only: organizer name and optional contact phone.
+  // Group events only: organizer name, optional contact phone and head count.
   organizerName: string | null;
   organizerPhone: string | null;
+  groupSize: number | null;
   startsAt: string;
   endsAt: string;
   createdBy: number;
@@ -95,6 +96,7 @@ export interface CreateEventRequest {
   capacity: number;
   organizerName?: string;
   organizerPhone?: string;
+  groupSize?: number;
   // Admin only: create the event without joining it themselves.
   skipSelf?: boolean;
   startsAt: string;

@@ -11,7 +11,7 @@ import {
   type ResourceId,
 } from '@tg-calendar/shared-types';
 import { useCreateEvent, useUpdateEvent } from '../useEvents';
-import { eventTypeLabel } from '../eventLabels';
+import { eventTypeLabel, resourceLabel } from '../eventLabels';
 import { ApiError } from '../../../shared/api/client';
 import { Button } from '../../../shared/ui/Button';
 
@@ -67,6 +67,9 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
   );
   const [organizerPhone, setOrganizerPhone] = useState<string>(
     event?.organizerPhone ?? '',
+  );
+  const [groupSize, setGroupSize] = useState<string>(
+    event?.groupSize != null ? String(event.groupSize) : '',
   );
   // Admin only: create an event without joining it (empty event for others).
   const [skipSelf, setSkipSelf] = useState<boolean>(false);
@@ -151,6 +154,8 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
       organizerName: isGroup ? organizerName.trim() : undefined,
       organizerPhone:
         isGroup && organizerPhone.trim() ? organizerPhone.trim() : undefined,
+      groupSize:
+        isGroup && groupSize.trim() ? Number(groupSize) : undefined,
       skipSelf: isAdmin && !isGroup && !isEdit ? skipSelf : undefined,
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
@@ -183,7 +188,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
       </label>
 
       <label className="field">
-        <span className="field__label">Площадка</span>
+        <span className="field__label">Майданчик</span>
         <select
           value={resourceId}
           disabled={limitOnly}
@@ -194,7 +199,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
         >
           {RESOURCE_IDS.map((id) => (
             <option key={id} value={id}>
-              №{id}
+              {resourceLabel(id)}
             </option>
           ))}
         </select>
@@ -203,7 +208,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
       {isGroup ? (
         <>
           <label className="field">
-            <span className="field__label">Ім'я організатора</span>
+            <span className="field__label">Ім'я організатора групи</span>
             <input
               type="text"
               value={organizerName}
@@ -223,6 +228,19 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
               onChange={(e) => {
                 clearError();
                 setOrganizerPhone(e.target.value);
+              }}
+            />
+          </label>
+
+          <label className="field">
+            <span className="field__label">Кількість людей (необов'язково)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={groupSize}
+              onChange={(e) => {
+                clearError();
+                setGroupSize(e.target.value.replace(/\D/g, '').slice(0, 3));
               }}
             />
           </label>

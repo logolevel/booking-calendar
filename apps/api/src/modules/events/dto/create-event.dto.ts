@@ -50,6 +50,12 @@ export class CreateEventDto {
   @Matches(/^[+()\d\s-]+$/, { message: 'phone must be a valid number' })
   organizerPhone?: string;
 
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  groupSize?: number;
+
   // Admin only: skip auto-joining the creator.
   @IsOptional()
   @IsBoolean()
