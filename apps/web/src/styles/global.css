@@ -209,6 +209,10 @@ button {
   color: var(--link);
 }
 
+.btn--danger {
+  color: var(--destructive);
+}
+
 .btn--block {
   width: 100%;
 }

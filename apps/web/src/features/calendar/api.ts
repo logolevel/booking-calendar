@@ -3,7 +3,7 @@ import type {
   EventDto,
   UpdateEventRequest,
 } from '@tg-calendar/shared-types';
-import { apiGet, apiPatch, apiPost } from '../../shared/api/client';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../../shared/api/client';
 
 export function fetchEvents(): Promise<EventDto[]> {
   return apiGet<EventDto[]>('/api/events');
@@ -18,4 +18,8 @@ export function updateEvent(
   body: UpdateEventRequest,
 ): Promise<EventDto> {
   return apiPatch<EventDto>(`/api/events/${id}`, body);
+}
+
+export function deleteEvent(id: string): Promise<void> {
+  return apiDelete<void>(`/api/events/${id}`);
 }

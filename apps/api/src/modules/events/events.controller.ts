@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Headers,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -79,6 +81,18 @@ export class EventsController {
     const realRole = await this.requireAccess(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     return this.events.update(id, user.id, role, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  async remove(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('id') id: string,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
+  ): Promise<void> {
+    const realRole = await this.requireAccess(user.id);
+    const role = this.access.applyPreview(realRole, preview) ?? realRole;
+    await this.events.remove(id, user.id, role);
   }
 
   private async requireAccess(userId: number) {

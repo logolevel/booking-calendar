@@ -27,6 +27,7 @@ interface TelegramWebApp {
   setBackgroundColor: (color: string) => void;
   onEvent: (eventType: string, handler: () => void) => void;
   offEvent: (eventType: string, handler: () => void) => void;
+  showConfirm?: (message: string, callback: (ok: boolean) => void) => void;
 }
 
 interface Window {

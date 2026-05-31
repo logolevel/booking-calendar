@@ -3,7 +3,7 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from '@tg-calendar/shared-types';
-import { createEvent, fetchEvents, updateEvent } from './api';
+import { createEvent, deleteEvent, fetchEvents, updateEvent } from './api';
 
 export function useEvents() {
   return useQuery({
@@ -27,6 +27,16 @@ export function useUpdateEvent() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdateEventRequest }) =>
       updateEvent(id, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+export function useDeleteEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteEvent(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['events'] });
     },

@@ -15,6 +15,7 @@ import {
   useUserSearch,
 } from '../useParticipation';
 import { useEventRealtime } from '../useEventRealtime';
+import { useDeleteEvent } from '../../calendar/useEvents';
 import { AddGuest } from './AddGuest';
 
 const RESOURCE_COLOR: Record<number, string> = {
@@ -53,11 +54,32 @@ export function ParticipantsPanel({
   useEventRealtime(event.id);
   const { data, isLoading } = useEventParticipants(event.id);
   const actions = useParticipationActions(event.id);
+  const deleteEvent = useDeleteEvent();
 
   // The event vanishes when its last member leaves; close the sheet then.
   const closeIfDeleted = (res: { deleted?: boolean }): void => {
     if (res.deleted) {
       onClose();
+    }
+  };
+
+  const removeEvent = (): void => {
+    deleteEvent.mutate(event.id, { onSuccess: onClose });
+  };
+
+  const confirmDelete = (): void => {
+    const message = 'Видалити подію? Цю дію не можна скасувати.';
+    const tg = window.Telegram?.WebApp;
+    if (tg?.showConfirm) {
+      tg.showConfirm(message, (ok) => {
+        if (ok) {
+          removeEvent();
+        }
+      });
+      return;
+    }
+    if (window.confirm(message)) {
+      removeEvent();
     }
   };
   const [query, setQuery] = useState('');
@@ -337,6 +359,15 @@ export function ParticipantsPanel({
         <div className="participants__edit">
           <Button variant="ghost" block onClick={onEdit}>
             Редагувати подію
+          </Button>
+          <Button
+            variant="ghost"
+            block
+            className="btn--danger"
+            disabled={deleteEvent.isPending}
+            onClick={confirmDelete}
+          >
+            Видалити подію
           </Button>
         </div>
       )}

@@ -35,6 +35,11 @@ async function request<T>(
     throw new ApiError(res.status, `Request failed with status ${res.status}`);
   }
 
+  // No-content responses (e.g. 204 from DELETE) have no JSON body.
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   return (await res.json()) as T;
 }
 

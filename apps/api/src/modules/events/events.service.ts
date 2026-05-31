@@ -182,6 +182,19 @@ export class EventsService {
     return this.prisma.eventParticipant.count({ where: { eventId } });
   }
 
+  // Only the current author (creator or promoted owner) or an admin may delete.
+  async remove(id: string, userId: number, role: Role): Promise<void> {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+    const isAuthor = event.createdBy === BigInt(userId);
+    if (role !== Role.admin && !isAuthor) {
+      throw new ForbiddenException('Only the author or an admin can delete');
+    }
+    await this.prisma.event.delete({ where: { id } });
+  }
+
   // Two events on the same resource (court) may not overlap in time.
   // Overlap: existing.startsAt < newEndsAt AND existing.endsAt > newStartsAt.
   private async assertNoOverlap(
