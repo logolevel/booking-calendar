@@ -109,7 +109,7 @@ export interface ParticipantDto {
   name: string;
   gender: Gender | null;
   isAdmin: boolean;
-  // Guest/group entry: contact phone, only exposed to admins.
+  // Guest/group entry: contact phone, visible to everyone.
   phone: string | null;
   addedByUserId: number;
   addedByName: string;

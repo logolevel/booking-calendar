@@ -435,8 +435,8 @@ export class ParticipationService {
               : p.guestName ?? 'Гість',
           gender: profile?.gender ?? null,
           isAdmin: profile?.isAdmin ?? false,
-          // Phone is only meaningful for guest entries and only for admins.
-          phone: isAdmin ? p.guestPhone : null,
+          // Guest contact phone, visible to everyone so they can reach them.
+          phone: p.guestPhone,
           addedByUserId: Number(p.addedByUserId),
           addedByName: nameOf(Number(p.addedByUserId)),
           isSelf,
