@@ -72,6 +72,11 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
   const isGroup = type === EVENT_TYPE.GROUP;
   // A non-admin author may edit only the capacity; everything else is locked.
   const limitOnly = isEdit && !isAdmin;
+  // An author may only raise the limit, never below who is already in.
+  const minCapacity = limitOnly
+    ? Math.max(MIN_CAPACITY, event?.participantCount ?? MIN_CAPACITY)
+    : MIN_CAPACITY;
+  const capacityOptions = CAPACITY_OPTIONS.filter((n) => n >= minCapacity);
   // The group type is admin-only, but keep it available when editing one.
   const typeOptions = Object.values(EVENT_TYPE).filter(
     (t) => t !== EVENT_TYPE.GROUP || isAdmin || event?.type === EVENT_TYPE.GROUP,
@@ -229,7 +234,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
               setCapacity(Number(e.target.value));
             }}
           >
-            {CAPACITY_OPTIONS.map((n) => (
+            {capacityOptions.map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>

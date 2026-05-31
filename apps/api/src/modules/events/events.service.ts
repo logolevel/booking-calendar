@@ -128,13 +128,20 @@ export class EventsService {
     }
 
     // The author (non-admin) may change the capacity only; everything else
-    // stays as it was. Admins may edit every field.
+    // stays as it was. They may not drop it below the people already in.
+    // Admins may edit every field.
     if (!isAdmin) {
+      const count = await this.countParticipants(id);
+      if (dto.capacity < count) {
+        throw new BadRequestException(
+          'Capacity cannot be below the current participant count',
+        );
+      }
       const event = await this.prisma.event.update({
         where: { id },
         data: { capacity: dto.capacity },
       });
-      return this.toDto(event, await this.countParticipants(id));
+      return this.toDto(event, count);
     }
 
     const startsAt = new Date(dto.startsAt);
