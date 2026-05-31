@@ -652,6 +652,32 @@ button {
   background: var(--bg);
 }
 
+.participants__phone {
+  display: block;
+  font-size: 13px;
+  color: var(--link);
+  margin-top: 2px;
+}
+
+.participants__group {
+  margin-top: 14px;
+}
+
+.participants__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.participants__group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .participants__section {
   margin-top: 16px;
 }

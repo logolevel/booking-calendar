@@ -82,6 +82,7 @@ model EventParticipant {
   eventId       String
   userId        BigInt?
   guestName     String?
+  guestPhone    String?
   addedByUserId BigInt
   joinedAt      DateTime @default(now())
   event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)

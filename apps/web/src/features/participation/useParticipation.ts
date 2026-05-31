@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EventParticipantsResponse } from '@tg-calendar/shared-types';
 import {
+  addGuest,
   addParticipant,
   fetchParticipants,
   joinEvent,
@@ -38,6 +39,11 @@ export function useParticipationActions(eventId: string) {
     mutationFn: (userId: number) => addParticipant(eventId, userId),
     onSuccess,
   });
+  const addGroup = useMutation({
+    mutationFn: (input: { name: string; phone: string }) =>
+      addGuest(eventId, input.name, input.phone),
+    onSuccess,
+  });
   const remove = useMutation({
     mutationFn: (participantId: string) =>
       removeParticipant(eventId, participantId),
@@ -56,11 +62,12 @@ export function useParticipationActions(eventId: string) {
     join.isPending ||
     leave.isPending ||
     add.isPending ||
+    addGroup.isPending ||
     remove.isPending ||
     queue.isPending ||
     unqueue.isPending;
 
-  return { join, leave, add, remove, queue, unqueue, isPending };
+  return { join, leave, add, addGroup, remove, queue, unqueue, isPending };
 }
 
 export function useUserSearch(query: string) {

@@ -109,6 +109,8 @@ export interface ParticipantDto {
   name: string;
   gender: Gender | null;
   isAdmin: boolean;
+  // Guest/group entry: contact phone, only exposed to admins.
+  phone: string | null;
   addedByUserId: number;
   addedByName: string;
   isSelf: boolean;
@@ -141,6 +143,8 @@ export interface EventParticipantsResponse {
   isParticipant: boolean;
   isWaitlisted: boolean;
   canAddPlusOne: boolean;
+  // Admin-only: add an outside person/group (kept off the user directory).
+  canAddGuest: boolean;
   participants: ParticipantDto[];
   waitlist: WaitlistEntryDto[];
   log: ParticipationLogDto[];
@@ -148,6 +152,11 @@ export interface EventParticipantsResponse {
 
 export interface AddParticipantRequest {
   userId: number;
+}
+
+export interface AddGuestRequest {
+  name: string;
+  phone: string;
 }
 
 export interface UserSearchResult {

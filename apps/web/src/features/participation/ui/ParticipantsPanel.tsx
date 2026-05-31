@@ -48,7 +48,29 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
   const actions = useParticipationActions(event.id);
   const [query, setQuery] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  const [showGroup, setShowGroup] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupPhone, setGroupPhone] = useState('');
   const search = useUserSearch(query);
+
+  const canSubmitGroup =
+    groupName.trim().length > 0 && groupPhone.trim().length >= 3;
+
+  const submitGroup = (): void => {
+    if (!canSubmitGroup) {
+      return;
+    }
+    actions.addGroup.mutate(
+      { name: groupName.trim(), phone: groupPhone.trim() },
+      {
+        onSuccess: () => {
+          setGroupName('');
+          setGroupPhone('');
+          setShowGroup(false);
+        },
+      },
+    );
+  };
 
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
@@ -155,6 +177,11 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
                       · додав(ла) {p.addedByName}
                     </span>
                   )}
+                  {p.phone && (
+                    <a className="participants__phone" href={`tel:${p.phone}`}>
+                      📞 {p.phone}
+                    </a>
+                  )}
                 </span>
                 {p.canRemove && (
                   <button
@@ -208,6 +235,57 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
                     <li className="participants__empty">Нічого не знайдено</li>
                   )}
                 </ul>
+              )}
+            </div>
+          )}
+
+          {data.canAddGuest && (
+            <div className="participants__group">
+              <label className="participants__checkbox">
+                <input
+                  type="checkbox"
+                  checked={showGroup}
+                  onChange={(e) => {
+                    setShowGroup(e.target.checked);
+                    actions.addGroup.reset();
+                  }}
+                />
+                Записати групу
+              </label>
+              {showGroup && (
+                <div className="participants__group-form">
+                  <input
+                    className="participants__search"
+                    placeholder="Ім'я людини / назва групи"
+                    value={groupName}
+                    onChange={(e) => {
+                      setGroupName(e.target.value);
+                      actions.addGroup.reset();
+                    }}
+                  />
+                  <input
+                    className="participants__search"
+                    inputMode="tel"
+                    placeholder="Номер телефону організатора"
+                    value={groupPhone}
+                    onChange={(e) => {
+                      setGroupPhone(e.target.value);
+                      actions.addGroup.reset();
+                    }}
+                  />
+                  {actions.addGroup.isError && (
+                    <p className="form__error">
+                      Не вдалося записати. Перевірте дані.
+                    </p>
+                  )}
+                  <Button
+                    block
+                    disabled={!canSubmitGroup || actions.isPending}
+                    onClick={submitGroup}
+                  >
+                    Записати
+                  </Button>
+                </div>
               )}
             </div>
           )}
