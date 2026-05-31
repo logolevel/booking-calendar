@@ -63,6 +63,8 @@ model Event {
   resourceId     Int
   title          String?
   capacity       Int                     @default(6)
+  // Admin-created events may stay empty; member events auto-delete when empty.
+  allowEmpty     Boolean                 @default(false)
   // Set only for `group` events: outside organizer contact details.
   organizerName  String?
   organizerPhone String?

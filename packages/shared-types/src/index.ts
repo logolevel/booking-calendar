@@ -95,6 +95,8 @@ export interface CreateEventRequest {
   capacity: number;
   organizerName?: string;
   organizerPhone?: string;
+  // Admin only: create the event without joining it themselves.
+  skipSelf?: boolean;
   startsAt: string;
   endsAt: string;
 }
@@ -147,6 +149,8 @@ export interface ParticipationLogDto {
 
 export interface EventParticipantsResponse {
   eventId: string;
+  // True when the event was auto-deleted (last member left an empty event).
+  deleted?: boolean;
   capacity: number;
   count: number;
   isFull: boolean;

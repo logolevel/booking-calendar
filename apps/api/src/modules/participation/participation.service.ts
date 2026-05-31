@@ -49,15 +49,56 @@ export class ParticipationService {
   private async lockEvent(
     tx: Tx,
     eventId: string,
-  ): Promise<{ capacity: number; createdBy: bigint }> {
-    const rows = await tx.$queryRaw<{ capacity: number; createdBy: bigint }[]>`
-      SELECT "capacity", "createdBy" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
+  ): Promise<{ capacity: number; createdBy: bigint; allowEmpty: boolean }> {
+    const rows = await tx.$queryRaw<
+      { capacity: number; createdBy: bigint; allowEmpty: boolean }[]
+    >`
+      SELECT "capacity", "createdBy", "allowEmpty" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
     `;
     const event = rows[0];
     if (!event) {
       throw new NotFoundException('Event not found');
     }
     return event;
+  }
+
+  // Member events disappear once the last participant leaves; admin events
+  // (allowEmpty) may stay empty. Returns true when the event was deleted.
+  private async deleteIfEmpty(
+    tx: Tx,
+    eventId: string,
+    allowEmpty: boolean,
+  ): Promise<boolean> {
+    if (allowEmpty) {
+      return false;
+    }
+    const count = await tx.eventParticipant.count({ where: { eventId } });
+    if (count > 0) {
+      return false;
+    }
+    await tx.event.delete({ where: { id: eventId } });
+    return true;
+  }
+
+  buildDeletedResponse(
+    eventId: string,
+    role: Role,
+  ): EventParticipantsResponse {
+    return {
+      eventId,
+      deleted: true,
+      capacity: 0,
+      count: 0,
+      isFull: false,
+      isParticipant: false,
+      isWaitlisted: false,
+      isAdmin: role === Role.admin,
+      isAuthor: false,
+      canAddPlusOne: false,
+      participants: [],
+      waitlist: [],
+      log: [],
+    };
   }
 
   // When the author leaves, hand authorship to the earliest-joined user
@@ -324,8 +365,8 @@ export class ParticipationService {
     actorId: number,
     role: Role,
     participantId: string,
-  ): Promise<void> {
-    const promotedUserId = await this.prisma.$transaction(async (tx) => {
+  ): Promise<boolean> {
+    const result = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       const participant = await tx.eventParticipant.findUnique({
         where: { id: participantId },
@@ -367,14 +408,18 @@ export class ParticipationService {
       if (wasAuthor) {
         await this.reassignAuthor(tx, eventId);
       }
-      return promoted;
+      const deleted = await this.deleteIfEmpty(tx, eventId, event.allowEmpty);
+      return { promoted, deleted };
     });
 
-    await this.notifyPromoted(eventId, promotedUserId);
+    if (!result.deleted) {
+      await this.notifyPromoted(eventId, result.promoted);
+    }
+    return result.deleted;
   }
 
-  async leaveSelf(eventId: string, actorId: number): Promise<void> {
-    const promotedUserId = await this.prisma.$transaction(async (tx) => {
+  async leaveSelf(eventId: string, actorId: number): Promise<boolean> {
+    const result = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       const mine = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
@@ -393,15 +438,19 @@ export class ParticipationService {
         if (wasAuthor) {
           await this.reassignAuthor(tx, eventId);
         }
-        return promoted;
+        const deleted = await this.deleteIfEmpty(tx, eventId, event.allowEmpty);
+        return { promoted, deleted };
       }
       await tx.eventWaitlist.deleteMany({
         where: { eventId, userId: BigInt(actorId) },
       });
-      return null;
+      return { promoted: null, deleted: false };
     });
 
-    await this.notifyPromoted(eventId, promotedUserId);
+    if (!result.deleted) {
+      await this.notifyPromoted(eventId, result.promoted);
+    }
+    return result.deleted;
   }
 
   private async notifyPromoted(

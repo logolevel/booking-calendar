@@ -61,9 +61,11 @@ export class ParticipationController {
     @Headers(PREVIEW_ROLE_HEADER) preview?: string,
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
-    await this.participation.leaveSelf(eventId, user.id);
+    const deleted = await this.participation.leaveSelf(eventId, user.id);
     this.gateway.emitEventUpdate(eventId);
-    return this.participation.getDetails(eventId, user.id, role);
+    return deleted
+      ? this.participation.buildDeletedResponse(eventId, role)
+      : this.participation.getDetails(eventId, user.id, role);
   }
 
   @Post('participants')
@@ -122,14 +124,16 @@ export class ParticipationController {
     @Headers(PREVIEW_ROLE_HEADER) preview?: string,
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
-    await this.participation.removeParticipant(
+    const deleted = await this.participation.removeParticipant(
       eventId,
       user.id,
       role,
       participantId,
     );
     this.gateway.emitEventUpdate(eventId);
-    return this.participation.getDetails(eventId, user.id, role);
+    return deleted
+      ? this.participation.buildDeletedResponse(eventId, role)
+      : this.participation.getDetails(eventId, user.id, role);
   }
 
   @Post('waitlist')

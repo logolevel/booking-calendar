@@ -249,6 +249,7 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
             <ParticipantsPanel
               event={activeEvent}
               onEdit={() => setMode('edit')}
+              onClose={closeForm}
             />
           ) : (
             <EventForm

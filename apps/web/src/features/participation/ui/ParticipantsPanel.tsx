@@ -42,12 +42,24 @@ function logText(entry: ParticipationLogDto): string {
 interface Props {
   event: EventDto;
   onEdit: () => void;
+  onClose: () => void;
 }
 
-export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
+export function ParticipantsPanel({
+  event,
+  onEdit,
+  onClose,
+}: Props): JSX.Element {
   useEventRealtime(event.id);
   const { data, isLoading } = useEventParticipants(event.id);
   const actions = useParticipationActions(event.id);
+
+  // The event vanishes when its last member leaves; close the sheet then.
+  const closeIfDeleted = (res: { deleted?: boolean }): void => {
+    if (res.deleted) {
+      onClose();
+    }
+  };
   const [query, setQuery] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const search = useUserSearch(query);
@@ -67,7 +79,9 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
           variant="secondary"
           block
           disabled={actions.isPending}
-          onClick={() => actions.leave.mutate()}
+          onClick={() =>
+            actions.leave.mutate(undefined, { onSuccess: closeIfDeleted })
+          }
         >
           Вийти
         </Button>
@@ -194,7 +208,9 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
                     className="participants__remove"
                     aria-label="Прибрати"
                     disabled={actions.isPending}
-                    onClick={() => actions.remove.mutate(p.id)}
+                    onClick={() =>
+                      actions.remove.mutate(p.id, { onSuccess: closeIfDeleted })
+                    }
                   >
                     ✕
                   </button>

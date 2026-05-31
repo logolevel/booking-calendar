@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsIn,
   IsISO8601,
   IsInt,
@@ -48,6 +49,11 @@ export class CreateEventDto {
   @MaxLength(32)
   @Matches(/^[+()\d\s-]+$/, { message: 'phone must be a valid number' })
   organizerPhone?: string;
+
+  // Admin only: skip auto-joining the creator.
+  @IsOptional()
+  @IsBoolean()
+  skipSelf?: boolean;
 
   @IsISO8601()
   startsAt!: string;

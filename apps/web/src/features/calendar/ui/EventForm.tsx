@@ -68,6 +68,8 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
   const [organizerPhone, setOrganizerPhone] = useState<string>(
     event?.organizerPhone ?? '',
   );
+  // Admin only: create an event without joining it (empty event for others).
+  const [skipSelf, setSkipSelf] = useState<boolean>(false);
 
   const isGroup = type === EVENT_TYPE.GROUP;
   // A non-admin author may edit only the capacity; everything else is locked.
@@ -149,6 +151,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
       organizerName: isGroup ? organizerName.trim() : undefined,
       organizerPhone:
         isGroup && organizerPhone.trim() ? organizerPhone.trim() : undefined,
+      skipSelf: isAdmin && !isGroup && !isEdit ? skipSelf : undefined,
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
     };
@@ -263,6 +266,17 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
           onChange={(e) => onEndChange(e.target.value)}
         />
       </label>
+
+      {isAdmin && !isGroup && !isEdit && (
+        <label className="participants__checkbox field">
+          <input
+            type="checkbox"
+            checked={skipSelf}
+            onChange={(e) => setSkipSelf(e.target.checked)}
+          />
+          Не записувати мене
+        </label>
+      )}
 
       {errorMessage && <p className="form__error">{errorMessage}</p>}
 

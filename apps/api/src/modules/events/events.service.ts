@@ -63,16 +63,21 @@ export class EventsService {
       throw new BadRequestException('endsAt must be after startsAt');
     }
 
+    const isAdmin = role === Role.admin;
     const isGroup = dto.type === EVENT_TYPE.GROUP;
-    if (isGroup && role !== Role.admin) {
+    if (isGroup && !isAdmin) {
       throw new ForbiddenException('Only an admin can create a group booking');
     }
 
-    if (role !== Role.admin) {
+    if (!isAdmin) {
       await this.assertWithinDateLimit(startsAt);
     }
 
     await this.assertNoOverlap(dto.resourceId, startsAt, endsAt);
+
+    // Only an admin may create an event they do not join (empty event). Such
+    // admin events are allowed to stay empty; member events are not.
+    const joinSelf = !isGroup && !(isAdmin && dto.skipSelf);
 
     const event = await this.prisma.event.create({
       data: {
@@ -80,6 +85,7 @@ export class EventsService {
         resourceId: dto.resourceId,
         title: dto.title ?? null,
         capacity: dto.capacity,
+        allowEmpty: isAdmin,
         organizerName: isGroup ? dto.organizerName ?? null : null,
         organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
         startsAt,
@@ -88,8 +94,7 @@ export class EventsService {
       },
     });
 
-    // Group bookings have no sign-up list, so the admin does not auto-join.
-    if (!isGroup) {
+    if (joinSelf) {
       await this.prisma.eventParticipant.create({
         data: {
           eventId: event.id,
@@ -107,7 +112,7 @@ export class EventsService {
       });
     }
 
-    return this.toDto(event, isGroup ? 0 : 1);
+    return this.toDto(event, joinSelf ? 1 : 0);
   }
 
   async update(
