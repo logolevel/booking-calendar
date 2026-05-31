@@ -683,6 +683,14 @@ button {
   font-weight: 600;
 }
 
+.participants__checkbox:has(input:disabled) {
+  opacity: 0.5;
+}
+
+.participants__search:disabled {
+  opacity: 0.5;
+}
+
 .participants__group-form {
   display: flex;
   flex-direction: column;

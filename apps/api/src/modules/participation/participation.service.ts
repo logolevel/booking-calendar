@@ -484,6 +484,7 @@ export class ParticipationService {
       isFull,
       isParticipant,
       isWaitlisted,
+      isAdmin: role === Role.admin,
       canAddPlusOne,
       participants: participants.map((p) => {
         const isSelf = p.userId != null && p.userId === actor;

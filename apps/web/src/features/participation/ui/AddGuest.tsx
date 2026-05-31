@@ -17,9 +17,15 @@ function isUkrainian(value: string): boolean {
 interface Props {
   actions: ReturnType<typeof useParticipationActions>;
   existingGuestIds: Set<string>;
+  // Quota used up (or event full): keep visible but inactive.
+  disabled: boolean;
 }
 
-export function AddGuest({ actions, existingGuestIds }: Props): JSX.Element {
+export function AddGuest({
+  actions,
+  existingGuestIds,
+  disabled,
+}: Props): JSX.Element {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [lastName, setLastName] = useState('');
@@ -65,13 +71,14 @@ export function AddGuest({ actions, existingGuestIds }: Props): JSX.Element {
       <label className="participants__checkbox">
         <input
           type="checkbox"
-          checked={open}
+          checked={open && !disabled}
+          disabled={disabled}
           onChange={(e) => (e.target.checked ? setOpen(true) : close())}
         />
         Додати гостя зі списку
       </label>
 
-      {open && (
+      {open && !disabled && (
         <div className="participants__group-form">
           <input
             className="participants__search"

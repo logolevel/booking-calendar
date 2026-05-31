@@ -150,6 +150,8 @@ export interface EventParticipantsResponse {
   isFull: boolean;
   isParticipant: boolean;
   isWaitlisted: boolean;
+  isAdmin: boolean;
+  // True when the viewer may add an extra right now (quota free, not full).
   canAddPlusOne: boolean;
   participants: ParticipantDto[];
   waitlist: WaitlistEntryDto[];

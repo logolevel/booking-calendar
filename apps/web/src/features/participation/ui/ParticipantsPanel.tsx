@@ -208,15 +208,16 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
 
           {renderSelfAction()}
 
-          {data.canAddPlusOne && (
+          {(data.isAdmin || data.isParticipant) && (
             <div className="participants__add">
               <input
                 className="participants__search"
                 placeholder="Додати учасника (ім'я або @username)"
                 value={query}
+                disabled={!data.canAddPlusOne}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              {query.trim().length >= 2 && (
+              {data.canAddPlusOne && query.trim().length >= 2 && (
                 <ul className="participants__results">
                   {searchResults.map((u) => (
                     <li key={u.id}>
@@ -244,8 +245,12 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
             </div>
           )}
 
-          {data.canAddPlusOne && (
-            <AddGuest actions={actions} existingGuestIds={existingGuestIds} />
+          {(data.isAdmin || data.isParticipant) && (
+            <AddGuest
+              actions={actions}
+              existingGuestIds={existingGuestIds}
+              disabled={!data.canAddPlusOne}
+            />
           )}
 
           {data.waitlist.length > 0 && (
