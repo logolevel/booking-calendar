@@ -31,13 +31,15 @@ export class UsersService {
     }
     const users = await this.prisma.user.findMany({
       where: {
+        // Only users who finished onboarding keep the directory tidy.
+        onboardedAt: { not: null },
         OR: [
           { firstName: { contains: q, mode: 'insensitive' } },
           { lastName: { contains: q, mode: 'insensitive' } },
           { username: { contains: q, mode: 'insensitive' } },
         ],
       },
-      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       take: SEARCH_LIMIT,
     });
     return users.map((u) => ({
