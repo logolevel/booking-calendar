@@ -46,15 +46,33 @@ export class ParticipationService {
 
   // Lock the event row for the duration of the transaction to avoid two
   // clients grabbing the last seat at the same time.
-  private async lockEvent(tx: Tx, eventId: string): Promise<{ capacity: number }> {
-    const rows = await tx.$queryRaw<{ capacity: number }[]>`
-      SELECT "capacity" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
+  private async lockEvent(
+    tx: Tx,
+    eventId: string,
+  ): Promise<{ capacity: number; createdBy: bigint }> {
+    const rows = await tx.$queryRaw<{ capacity: number; createdBy: bigint }[]>`
+      SELECT "capacity", "createdBy" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
     `;
     const event = rows[0];
     if (!event) {
       throw new NotFoundException('Event not found');
     }
     return event;
+  }
+
+  // When the author leaves, hand authorship to the earliest-joined user
+  // participant that remains (run this after any waitlist promotion).
+  private async reassignAuthor(tx: Tx, eventId: string): Promise<void> {
+    const next = await tx.eventParticipant.findFirst({
+      where: { eventId, userId: { not: null } },
+      orderBy: { joinedAt: 'asc' },
+    });
+    if (next?.userId != null) {
+      await tx.event.update({
+        where: { id: eventId },
+        data: { createdBy: next.userId },
+      });
+    }
   }
 
   private logAction(
@@ -324,6 +342,8 @@ export class ParticipationService {
         throw new ForbiddenException('You can remove only who you added');
       }
 
+      const wasAuthor =
+        participant.userId != null && participant.userId === event.createdBy;
       const guest = participant.guestId
         ? await tx.guest.findUnique({ where: { id: participant.guestId } })
         : null;
@@ -339,7 +359,15 @@ export class ParticipationService {
           guestName: guest ? this.guests.displayName(guest) : null,
         },
       );
-      return this.promoteFromWaitlist(tx, eventId, event.capacity);
+      const promoted = await this.promoteFromWaitlist(
+        tx,
+        eventId,
+        event.capacity,
+      );
+      if (wasAuthor) {
+        await this.reassignAuthor(tx, eventId);
+      }
+      return promoted;
     });
 
     await this.notifyPromoted(eventId, promotedUserId);
@@ -352,11 +380,20 @@ export class ParticipationService {
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
       if (mine) {
+        const wasAuthor = mine.userId != null && mine.userId === event.createdBy;
         await tx.eventParticipant.delete({ where: { id: mine.id } });
         await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.LEAVE, {
           userId: actorId,
         });
-        return this.promoteFromWaitlist(tx, eventId, event.capacity);
+        const promoted = await this.promoteFromWaitlist(
+          tx,
+          eventId,
+          event.capacity,
+        );
+        if (wasAuthor) {
+          await this.reassignAuthor(tx, eventId);
+        }
+        return promoted;
       }
       await tx.eventWaitlist.deleteMany({
         where: { eventId, userId: BigInt(actorId) },
@@ -485,6 +522,7 @@ export class ParticipationService {
       isParticipant,
       isWaitlisted,
       isAdmin: role === Role.admin,
+      isAuthor: event.createdBy === actor,
       canAddPlusOne,
       participants: participants.map((p) => {
         const isSelf = p.userId != null && p.userId === actor;

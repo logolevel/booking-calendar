@@ -78,7 +78,7 @@ export class EventsController {
   ): Promise<EventDto> {
     const realRole = await this.requireAccess(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
-    return this.events.update(id, role, dto);
+    return this.events.update(id, user.id, role, dto);
   }
 
   private async requireAccess(userId: number) {

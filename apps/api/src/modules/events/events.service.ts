@@ -41,7 +41,15 @@ export class EventsService {
       where: { startsAt: { gte: from, lte: to } },
       orderBy: { startsAt: 'asc' },
     });
-    return events.map((event) => this.toDto(event));
+    const counts = await this.prisma.eventParticipant.groupBy({
+      by: ['eventId'],
+      where: { eventId: { in: events.map((e) => e.id) } },
+      _count: { _all: true },
+    });
+    const countMap = new Map(counts.map((c) => [c.eventId, c._count._all]));
+    return events.map((event) =>
+      this.toDto(event, countMap.get(event.id) ?? 0),
+    );
   }
 
   async create(
@@ -99,17 +107,34 @@ export class EventsService {
       });
     }
 
-    return this.toDto(event);
+    return this.toDto(event, isGroup ? 0 : 1);
   }
 
   async update(
     id: string,
+    userId: number,
     role: Role,
     dto: CreateEventDto,
   ): Promise<EventDto> {
     const existing = await this.prisma.event.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Event not found');
+    }
+
+    const isAdmin = role === Role.admin;
+    const isAuthor = existing.createdBy === BigInt(userId);
+    if (!isAdmin && !isAuthor) {
+      throw new ForbiddenException('Only the author or an admin can edit');
+    }
+
+    // The author (non-admin) may change the capacity only; everything else
+    // stays as it was. Admins may edit every field.
+    if (!isAdmin) {
+      const event = await this.prisma.event.update({
+        where: { id },
+        data: { capacity: dto.capacity },
+      });
+      return this.toDto(event, await this.countParticipants(id));
     }
 
     const startsAt = new Date(dto.startsAt);
@@ -119,13 +144,6 @@ export class EventsService {
     }
 
     const isGroup = dto.type === EVENT_TYPE.GROUP;
-    if (isGroup && role !== Role.admin) {
-      throw new ForbiddenException('Only an admin can manage a group booking');
-    }
-
-    if (role !== Role.admin) {
-      await this.assertWithinDateLimit(startsAt);
-    }
 
     await this.assertNoOverlap(dto.resourceId, startsAt, endsAt, id);
 
@@ -142,7 +160,11 @@ export class EventsService {
         endsAt,
       },
     });
-    return this.toDto(event);
+    return this.toDto(event, await this.countParticipants(id));
+  }
+
+  private countParticipants(eventId: string): Promise<number> {
+    return this.prisma.eventParticipant.count({ where: { eventId } });
   }
 
   // Two events on the same resource (court) may not overlap in time.
@@ -184,13 +206,14 @@ export class EventsService {
     }
   }
 
-  private toDto(event: EventRow): EventDto {
+  private toDto(event: EventRow, participantCount: number): EventDto {
     return {
       id: event.id,
       type: event.type as EventDto['type'],
       resourceId: event.resourceId as ResourceId,
       title: event.title,
       capacity: event.capacity,
+      participantCount,
       organizerName: event.organizerName,
       organizerPhone: event.organizerPhone,
       startsAt: event.startsAt.toISOString(),

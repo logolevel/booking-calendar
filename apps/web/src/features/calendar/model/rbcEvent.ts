@@ -1,4 +1,4 @@
-import type { EventDto } from '@tg-calendar/shared-types';
+import { EVENT_TYPE, type EventDto } from '@tg-calendar/shared-types';
 import { eventTypeLabel } from '../eventLabels';
 
 export interface RbcEvent {
@@ -10,8 +10,14 @@ export interface RbcEvent {
 }
 
 export function toRbcEvent(event: EventDto): RbcEvent {
+  const label = event.title ?? eventTypeLabel(event.type);
+  // Group bookings have no roster; everyone else shows the fill count.
+  const title =
+    event.type === EVENT_TYPE.GROUP
+      ? label
+      : `${label} · ${event.participantCount}/${event.capacity}`;
   return {
-    title: event.title ?? eventTypeLabel(event.type),
+    title,
     start: new Date(event.startsAt),
     end: new Date(event.endsAt),
     resourceId: event.resourceId,

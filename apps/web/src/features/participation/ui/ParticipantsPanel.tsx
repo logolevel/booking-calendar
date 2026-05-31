@@ -312,11 +312,13 @@ export function ParticipantsPanel({ event, onEdit }: Props): JSX.Element {
         </>
       )}
 
-      <div className="participants__edit">
-        <Button variant="ghost" block onClick={onEdit}>
-          Редагувати подію
-        </Button>
-      </div>
+      {data && (data.isAdmin || data.isAuthor) && (
+        <div className="participants__edit">
+          <Button variant="ghost" block onClick={onEdit}>
+            Редагувати подію
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

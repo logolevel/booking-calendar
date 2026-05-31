@@ -78,6 +78,8 @@ export interface EventDto {
   resourceId: ResourceId;
   title: string | null;
   capacity: number;
+  // Current number of participants (used for the calendar fill indicator).
+  participantCount: number;
   // Group events only: organizer name and optional contact phone.
   organizerName: string | null;
   organizerPhone: string | null;
@@ -151,6 +153,8 @@ export interface EventParticipantsResponse {
   isParticipant: boolean;
   isWaitlisted: boolean;
   isAdmin: boolean;
+  // True when the viewer is the event author (creator / promoted owner).
+  isAuthor: boolean;
   // True when the viewer may add an extra right now (quota free, not full).
   canAddPlusOne: boolean;
   participants: ParticipantDto[];

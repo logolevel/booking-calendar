@@ -24,7 +24,12 @@ import {
   isAfter,
 } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { ROLE, type EventDto, type Role } from '@tg-calendar/shared-types';
+import {
+  EVENT_TYPE,
+  ROLE,
+  type EventDto,
+  type Role,
+} from '@tg-calendar/shared-types';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { useEvents } from '../useEvents';
 import { toRbcEvent, type RbcEvent } from '../model/rbcEvent';
@@ -54,10 +59,28 @@ const localizer = dateFnsLocalizer({
   locales: { uk },
 });
 
-const RESOURCE_COLORS: Record<number, string> = {
-  1: 'var(--resource-1)',
-  2: 'var(--resource-2)',
+// Light shade = free space, dark shade = taken; fills bottom-up like a glass.
+const RESOURCE_FILL: Record<number, { light: string; dark: string }> = {
+  1: { light: '#7fd29c', dark: '#1c7a42' },
+  2: { light: '#f0938e', dark: '#bf372d' },
 };
+
+function eventFillStyle(event: RbcEvent): { background: string } {
+  const colors = RESOURCE_FILL[event.resourceId] ?? {
+    light: 'var(--accent)',
+    dark: 'var(--accent)',
+  };
+  const { capacity, participantCount, type } = event.raw;
+  const pct =
+    type === EVENT_TYPE.GROUP
+      ? 100
+      : capacity > 0
+        ? Math.min(participantCount / capacity, 1) * 100
+        : 0;
+  return {
+    background: `linear-gradient(to top, ${colors.dark} 0%, ${colors.dark} ${pct}%, ${colors.light} ${pct}%, ${colors.light} 100%)`,
+  };
+}
 
 type CalendarProps = ComponentProps<typeof Calendar<RbcEvent>>;
 
@@ -204,11 +227,7 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
         min={new Date(1970, 0, 1, 8, 0, 0)}
         max={new Date(1970, 0, 1, 23, 0, 0)}
         popup
-        eventPropGetter={(event) => ({
-          style: {
-            backgroundColor: RESOURCE_COLORS[event.resourceId] ?? 'var(--accent)',
-          },
-        })}
+        eventPropGetter={(event) => ({ style: eventFillStyle(event) })}
       />
 
       {isLoading && <p className="state__text">Завантаження подій…</p>}

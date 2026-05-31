@@ -70,6 +70,8 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
   );
 
   const isGroup = type === EVENT_TYPE.GROUP;
+  // A non-admin author may edit only the capacity; everything else is locked.
+  const limitOnly = isEdit && !isAdmin;
   // The group type is admin-only, but keep it available when editing one.
   const typeOptions = Object.values(EVENT_TYPE).filter(
     (t) => t !== EVENT_TYPE.GROUP || isAdmin || event?.type === EVENT_TYPE.GROUP,
@@ -158,6 +160,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
         <span className="field__label">Тип</span>
         <select
           value={type}
+          disabled={limitOnly}
           onChange={(e) => {
             clearError();
             setType(e.target.value as EventType);
@@ -175,6 +178,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
         <span className="field__label">Площадка</span>
         <select
           value={resourceId}
+          disabled={limitOnly}
           onChange={(e) => {
             clearError();
             setResourceId(Number(e.target.value) as ResourceId);
@@ -239,6 +243,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
         <input
           type="datetime-local"
           value={startsAt}
+          disabled={limitOnly}
           onChange={(e) => onStartChange(e.target.value)}
           onFocus={onStartFocus}
         />
@@ -249,7 +254,7 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
         <input
           type="datetime-local"
           value={endsAt}
-          disabled={!startTouched}
+          disabled={limitOnly || !startTouched}
           onChange={(e) => onEndChange(e.target.value)}
         />
       </label>
