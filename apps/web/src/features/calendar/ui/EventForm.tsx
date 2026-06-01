@@ -151,7 +151,7 @@ export function EventForm({
 
   const errorMessage = mutation.isError
     ? mutation.error instanceof ApiError && mutation.error.status === 409
-      ? 'Цей час на площадці вже зайнятий. Оберіть інший час або площадку.'
+      ? 'Цей час на майданчику вже зайнятий. Оберіть інший час або майданчик.'
       : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
     : null;
 

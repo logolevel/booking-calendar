@@ -440,6 +440,20 @@ button {
   cursor: not-allowed;
 }
 
+/* Checkboxes must keep their native look, not the boxed text-input style. */
+.field input[type='checkbox'],
+.participants__checkbox input[type='checkbox'] {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  appearance: auto;
+  -webkit-appearance: auto;
+  accent-color: var(--accent);
+}
+
 /* Days a regular user cannot book (past or beyond the limit) are dimmed. */
 .rbc-day-off,
 .rbc-day-off.rbc-day-bg {
@@ -681,6 +695,7 @@ button {
 
 .participants__checkbox {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
   font-size: 15px;
