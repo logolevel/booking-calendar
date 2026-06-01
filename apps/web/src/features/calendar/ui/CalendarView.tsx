@@ -184,12 +184,6 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
     if (!canCreate || view === Views.MONTH || view === Views.AGENDA) {
       return;
     }
-    // A touch that began on an existing event should open it, not create a
-    // slot (the low long-press threshold otherwise hijacks the tap on touch).
-    if (pressedOnEvent.current) {
-      pressedOnEvent.current = false;
-      return;
-    }
     const start = clampStart(snap30(slot.start));
     let end: Date;
     if (slot.action === 'select') {
@@ -231,13 +225,8 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
   }, [data, draft, formOpen]);
 
   const touchStart = useRef<{ x: number; y: number } | null>(null);
-  // True while a touch gesture started on top of an existing event block.
-  const pressedOnEvent = useRef<boolean>(false);
 
   const onTouchStart = (e: TouchEvent): void => {
-    pressedOnEvent.current = Boolean(
-      (e.target as HTMLElement).closest?.('.rbc-event'),
-    );
     if (formOpen) {
       return;
     }
@@ -281,7 +270,7 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
         onSelectEvent={openDetails}
         selectable={canCreate}
         onSelectSlot={onSelectSlot}
-        longPressThreshold={20}
+        longPressThreshold={250}
         views={calendarViews}
         components={calendarComponents}
         dayPropGetter={dayPropGetter}
