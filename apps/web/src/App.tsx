@@ -82,14 +82,16 @@ export function App(): JSX.Element {
         <span className="app__title">Календар</span>
         {me.isAdmin ? (
           <div className="app__header-actions">
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Налаштування"
-              onClick={() => setSettingsOpen(true)}
-            >
-              ⚙️
-            </button>
+            {me.role === ROLE.ADMIN && (
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Налаштування"
+                onClick={() => setSettingsOpen(true)}
+              >
+                ⚙️
+              </button>
+            )}
             <RoleSwitch
               value={preview ?? ROLE.ADMIN}
               onChange={(role) => setPreview(role === ROLE.ADMIN ? null : role)}
