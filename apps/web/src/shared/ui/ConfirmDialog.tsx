@@ -39,7 +39,7 @@ export function ConfirmDialog({
           <Button variant="secondary" block onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button block className="btn--danger" onClick={onConfirm}>
+          <Button block className="btn--danger-solid" onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>

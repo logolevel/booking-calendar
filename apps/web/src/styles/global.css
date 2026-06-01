@@ -213,6 +213,11 @@ button {
   color: var(--destructive);
 }
 
+.btn--danger-solid {
+  background: var(--destructive);
+  color: #fff;
+}
+
 .btn--block {
   width: 100%;
 }
