@@ -26,6 +26,7 @@ import {
 } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import {
+  BOOKING_OPEN_HOUR,
   EVENT_TYPE,
   ROLE,
   type EventDto,
@@ -149,13 +150,17 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
   const canCreate = role === ROLE.ADMIN || role === ROLE.MEMBER;
   const isAdmin = role === ROLE.ADMIN;
 
-  // Regular users can only book within [today, today + maxDaysAhead].
+  // Regular users can only book within [today, today + maxDaysAhead]. The
+  // newest day opens at BOOKING_OPEN_HOUR, so before that it stays dimmed.
   const dayPropGetter = (day: Date): { className?: string } => {
     if (isAdmin) {
       return {};
     }
-    const today = startOfDay(new Date());
-    const maxDate = startOfDay(addDays(today, maxDaysAhead));
+    const now = new Date();
+    const effectiveDaysAhead =
+      now.getHours() < BOOKING_OPEN_HOUR ? maxDaysAhead - 1 : maxDaysAhead;
+    const today = startOfDay(now);
+    const maxDate = startOfDay(addDays(today, effectiveDaysAhead));
     if (isBefore(day, today) || isAfter(startOfDay(day), maxDate)) {
       return { className: 'rbc-day-off' };
     }

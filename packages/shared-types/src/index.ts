@@ -36,6 +36,10 @@ export const DEFAULT_CAPACITY = 6;
 // Fallback used when no value is configured in the database.
 export const DEFAULT_MAX_DAYS_AHEAD = 7;
 
+// The furthest bookable day for regular users opens at this local hour
+// (Europe/Kyiv) instead of midnight, to avoid a midnight sign-up rush.
+export const BOOKING_OPEN_HOUR = 10;
+
 export interface TelegramUser {
   id: number;
   firstName: string;

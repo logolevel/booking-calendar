@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import {
+  BOOKING_OPEN_HOUR,
   EVENT_TYPE,
   PARTICIPATION_ACTION,
   type EventDto,
@@ -229,18 +230,39 @@ export class EventsService {
 
   private async assertWithinDateLimit(startsAt: Date): Promise<void> {
     const maxDaysAhead = await this.settings.getMaxDaysAhead();
-    const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const maxDate = new Date(now);
-    maxDate.setDate(maxDate.getDate() + maxDaysAhead);
-    maxDate.setHours(23, 59, 59, 999);
+    const now = EventsService.kyivDayInfo(new Date());
+    const target = EventsService.kyivDayInfo(startsAt);
 
-    if (startsAt < todayStart || startsAt > maxDate) {
+    // The newest day only opens at BOOKING_OPEN_HOUR; before that the window
+    // is one day shorter, so popular slots aren't grabbed at midnight.
+    const effectiveDaysAhead =
+      now.hour < BOOKING_OPEN_HOUR ? maxDaysAhead - 1 : maxDaysAhead;
+    const maxDayIndex = now.dayIndex + effectiveDaysAhead;
+
+    if (target.dayIndex < now.dayIndex || target.dayIndex > maxDayIndex) {
       throw new ForbiddenException(
         `Events are allowed only within the next ${maxDaysAhead} days`,
       );
     }
+  }
+
+  // Calendar day (as an epoch day index) and hour of a moment in Kyiv time,
+  // so the booking window is correct regardless of the server time zone.
+  private static kyivDayInfo(date: Date): { dayIndex: number; hour: number } {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Kyiv',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const get = (type: string): number =>
+      Number(parts.find((p) => p.type === type)?.value ?? '0');
+    const dayIndex = Math.floor(
+      Date.UTC(get('year'), get('month') - 1, get('day')) / 86_400_000,
+    );
+    return { dayIndex, hour: get('hour') };
   }
 
   private toDto(event: EventRow, participantCount: number): EventDto {
