@@ -89,6 +89,8 @@ export function ParticipantsPanel({
   const isGroup = event.type === EVENT_TYPE.GROUP;
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
+  // A finished event is read-only: only viewing, no joins/edits/deletes.
+  const ended = end.getTime() <= Date.now();
   const title = event.title ?? eventTypeLabel(event.type);
 
   const renderSelfAction = (): JSX.Element | null => {
@@ -174,6 +176,10 @@ export function ParticipantsPanel({
         </div>
       </div>
 
+      {ended && (
+        <p className="participants__readonly">Подію завершено · лише перегляд</p>
+      )}
+
       {isGroup && (
         <div className="participants__organizer">
           <div className="participants__subtitle">Організатор</div>
@@ -229,7 +235,7 @@ export function ParticipantsPanel({
                     </span>
                   )}
                 </span>
-                {p.canRemove && (
+                {p.canRemove && !ended && (
                   <button
                     type="button"
                     className="participants__remove"
@@ -249,9 +255,9 @@ export function ParticipantsPanel({
             )}
           </ul>
 
-          {renderSelfAction()}
+          {!ended && renderSelfAction()}
 
-          {(data.isAdmin || data.isParticipant) && (
+          {!ended && (data.isAdmin || data.isParticipant) && (
             <div className="participants__add">
               <input
                 className="participants__search"
@@ -288,7 +294,7 @@ export function ParticipantsPanel({
             </div>
           )}
 
-          {(data.isAdmin || data.isParticipant) && (
+          {!ended && (data.isAdmin || data.isParticipant) && (
             <AddGuest
               actions={actions}
               existingGuestIds={existingGuestIds}
@@ -312,7 +318,7 @@ export function ParticipantsPanel({
                       />
                       {w.isSelf && <span className="participants__you"> (ви)</span>}
                     </span>
-                    {w.isSelf && (
+                    {w.isSelf && !ended && (
                       <button
                         type="button"
                         className="participants__remove"
@@ -355,7 +361,7 @@ export function ParticipantsPanel({
         </>
       )}
 
-      {data && (data.isAdmin || data.isAuthor) && (
+      {!ended && data && (data.isAdmin || data.isAuthor) && (
         <div className="participants__edit">
           <Button variant="ghost" block onClick={onEdit}>
             Редагувати подію

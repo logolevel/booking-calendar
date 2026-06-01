@@ -127,6 +127,7 @@ export class EventsService {
     if (!existing) {
       throw new NotFoundException('Event not found');
     }
+    this.assertNotEnded(existing.endsAt);
 
     const isAdmin = role === Role.admin;
     const isAuthor = existing.createdBy === BigInt(userId);
@@ -188,11 +189,19 @@ export class EventsService {
     if (!event) {
       throw new NotFoundException('Event not found');
     }
+    this.assertNotEnded(event.endsAt);
     const isAuthor = event.createdBy === BigInt(userId);
     if (role !== Role.admin && !isAuthor) {
       throw new ForbiddenException('Only the author or an admin can delete');
     }
     await this.prisma.event.delete({ where: { id } });
+  }
+
+  // A finished event is frozen: nobody (not even an admin) may edit or delete.
+  private assertNotEnded(endsAt: Date): void {
+    if (endsAt.getTime() <= Date.now()) {
+      throw new ForbiddenException('Event has already ended');
+    }
   }
 
   // Two events on the same resource (court) may not overlap in time.

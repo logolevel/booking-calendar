@@ -693,6 +693,17 @@ button {
   margin-top: 14px;
 }
 
+.participants__readonly {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(128, 128, 128, 0.14);
+  color: var(--hint);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
 .participants__checkbox {
   display: flex;
   flex-direction: row;

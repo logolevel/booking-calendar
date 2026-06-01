@@ -50,17 +50,34 @@ export class ParticipationService {
   private async lockEvent(
     tx: Tx,
     eventId: string,
-  ): Promise<{ capacity: number; createdBy: bigint; allowEmpty: boolean }> {
+  ): Promise<{
+    capacity: number;
+    createdBy: bigint;
+    allowEmpty: boolean;
+    endsAt: Date;
+  }> {
     const rows = await tx.$queryRaw<
-      { capacity: number; createdBy: bigint; allowEmpty: boolean }[]
+      {
+        capacity: number;
+        createdBy: bigint;
+        allowEmpty: boolean;
+        endsAt: Date;
+      }[]
     >`
-      SELECT "capacity", "createdBy", "allowEmpty" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
+      SELECT "capacity", "createdBy", "allowEmpty", "endsAt" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
     `;
     const event = rows[0];
     if (!event) {
       throw new NotFoundException('Event not found');
     }
     return event;
+  }
+
+  // A finished event is fully read-only: no joins, leaves, or roster edits.
+  private assertActive(endsAt: Date): void {
+    if (endsAt.getTime() <= Date.now()) {
+      throw new ForbiddenException('Event has already ended');
+    }
   }
 
   // Member events disappear once the last participant leaves; admin events
@@ -170,6 +187,7 @@ export class ParticipationService {
   async joinSelf(eventId: string, actorId: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
       const existing = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
@@ -204,6 +222,7 @@ export class ParticipationService {
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
 
       const target = await tx.user.findUnique({
         where: { id: BigInt(targetUserId) },
@@ -315,6 +334,7 @@ export class ParticipationService {
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
       const guest = await tx.guest.findUnique({ where: { id: guestId } });
       if (!guest) {
         throw new BadRequestException('Guest not found');
@@ -343,6 +363,7 @@ export class ParticipationService {
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
       await this.assertCanAddExtra(tx, eventId, actorId, role, event.capacity);
       const guest = await tx.guest.create({
         data: {
@@ -369,6 +390,7 @@ export class ParticipationService {
   ): Promise<boolean> {
     const result = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
       const participant = await tx.eventParticipant.findUnique({
         where: { id: participantId },
       });
@@ -422,6 +444,7 @@ export class ParticipationService {
   async leaveSelf(eventId: string, actorId: number): Promise<boolean> {
     const result = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
       const mine = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
@@ -471,6 +494,7 @@ export class ParticipationService {
   async joinWaitlist(eventId: string, actorId: number): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
       const existing = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
@@ -501,6 +525,13 @@ export class ParticipationService {
   }
 
   async leaveWaitlist(eventId: string, actorId: number): Promise<void> {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { endsAt: true },
+    });
+    if (event) {
+      this.assertActive(event.endsAt);
+    }
     await this.prisma.eventWaitlist.deleteMany({
       where: { eventId, userId: BigInt(actorId) },
     });
