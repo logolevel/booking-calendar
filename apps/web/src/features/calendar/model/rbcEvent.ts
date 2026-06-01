@@ -7,6 +7,28 @@ export interface RbcEvent {
   end: Date;
   resourceId: number;
   raw: EventDto;
+  // A transient placeholder shown while picking a slot to create an event.
+  isDraft?: boolean;
+}
+
+// Synthetic event rendered on the grid while the user picks a new slot.
+export function draftRbcEvent(start: Date, end: Date): RbcEvent {
+  return {
+    title: 'Нова подія',
+    start,
+    end,
+    resourceId: 0,
+    isDraft: true,
+    raw: {
+      id: '__draft__',
+      type: EVENT_TYPE.MIXED,
+      resourceId: 0,
+      capacity: 0,
+      participantCount: 0,
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+    } as unknown as EventDto,
+  };
 }
 
 export function toRbcEvent(event: EventDto): RbcEvent {

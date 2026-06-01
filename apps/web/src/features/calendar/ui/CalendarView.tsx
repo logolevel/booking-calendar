@@ -10,6 +10,7 @@ import {
   dateFnsLocalizer,
   Views,
   type View,
+  type SlotInfo,
 } from 'react-big-calendar';
 import {
   format,
@@ -32,13 +33,24 @@ import {
 } from '@tg-calendar/shared-types';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { useEvents } from '../useEvents';
-import { toRbcEvent, type RbcEvent } from '../model/rbcEvent';
+import { toRbcEvent, draftRbcEvent, type RbcEvent } from '../model/rbcEvent';
+import {
+  addStep,
+  clampEnd,
+  clampStart,
+  snap30,
+  DEFAULT_DURATION_MIN,
+  STEP_MIN,
+} from '../model/slotTime';
 import { Sheet } from '../../../shared/ui/Sheet';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarDayHeader } from './CalendarDayHeader';
 import { EventForm } from './EventForm';
+import { SlotPreview } from './SlotPreview';
 import { ThreeDayView } from './ThreeDayView';
 import { ParticipantsPanel } from '../../participation/ui/ParticipantsPanel';
+
+const DEFAULT_DURATION_STEPS = DEFAULT_DURATION_MIN / STEP_MIN;
 
 const THREE_DAY_VIEW = 'three_day';
 
@@ -129,7 +141,10 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
   const [date, setDate] = useState<Date>(new Date());
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [activeEvent, setActiveEvent] = useState<EventDto | null>(null);
-  const [mode, setMode] = useState<'details' | 'edit' | 'create'>('create');
+  const [mode, setMode] = useState<'details' | 'edit' | 'create' | 'slot'>(
+    'create',
+  );
+  const [draft, setDraft] = useState<{ start: Date; end: Date } | null>(null);
 
   const canCreate = role === ROLE.ADMIN || role === ROLE.MEMBER;
   const isAdmin = role === ROLE.ADMIN;
@@ -149,33 +164,65 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
 
   const openCreate = (): void => {
     setActiveEvent(null);
+    setDraft(null);
     setMode('create');
     setFormOpen(true);
   };
 
   const openDetails = (event: RbcEvent): void => {
+    // Tapping the transient draft block should not open a roster.
+    if (event.isDraft) {
+      return;
+    }
     setActiveEvent(event.raw);
     setMode('details');
+    setFormOpen(true);
+  };
+
+  // Tap (or drag) on an empty slot to start creating an event there.
+  const onSelectSlot = (slot: SlotInfo): void => {
+    if (!canCreate || view === Views.MONTH || view === Views.AGENDA) {
+      return;
+    }
+    const start = clampStart(snap30(slot.start));
+    let end: Date;
+    if (slot.action === 'select') {
+      end = snap30(slot.end);
+      if (end <= start) {
+        end = addStep(start, 1);
+      }
+    } else {
+      end = addStep(start, DEFAULT_DURATION_STEPS);
+    }
+    setDraft({ start, end: clampEnd(start, end) });
+    setActiveEvent(null);
+    setMode('slot');
     setFormOpen(true);
   };
 
   const closeForm = (): void => {
     setFormOpen(false);
     setActiveEvent(null);
+    setDraft(null);
     setMode('create');
   };
 
   const sheetTitle =
     mode === 'details'
       ? 'Подія'
-      : mode === 'edit'
-        ? 'Редагувати подію'
-        : 'Нова подія';
+      : mode === 'slot'
+        ? 'Новий запис'
+        : mode === 'edit'
+          ? 'Редагувати подію'
+          : 'Нова подія';
 
-  const events = useMemo<RbcEvent[]>(
-    () => (data ?? []).map(toRbcEvent),
-    [data],
-  );
+  const events = useMemo<RbcEvent[]>(() => {
+    const base = (data ?? []).map(toRbcEvent);
+    if (draft && formOpen) {
+      base.push(draftRbcEvent(draft.start, draft.end));
+    }
+    return base;
+  }, [data, draft, formOpen]);
 
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -221,13 +268,20 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
         date={date}
         onNavigate={setDate}
         onSelectEvent={openDetails}
+        selectable={canCreate}
+        onSelectSlot={onSelectSlot}
+        longPressThreshold={250}
         views={calendarViews}
         components={calendarComponents}
         dayPropGetter={dayPropGetter}
         min={new Date(1970, 0, 1, 8, 0, 0)}
         max={new Date(1970, 0, 1, 23, 0, 0)}
         popup
-        eventPropGetter={(event) => ({ style: eventFillStyle(event) })}
+        eventPropGetter={(event) =>
+          event.isDraft
+            ? { className: 'rbc-event--draft' }
+            : { style: eventFillStyle(event) }
+        }
       />
 
       {isLoading && <p className="state__text">Завантаження подій…</p>}
@@ -251,10 +305,20 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
               onEdit={() => setMode('edit')}
               onClose={closeForm}
             />
+          ) : mode === 'slot' && draft ? (
+            <SlotPreview
+              start={draft.start}
+              end={draft.end}
+              onChange={(start, end) => setDraft({ start, end })}
+              onCreate={() => setMode('create')}
+              onCancel={closeForm}
+            />
           ) : (
             <EventForm
               event={activeEvent ?? undefined}
               isAdmin={isAdmin}
+              initialStart={draft ? draft.start.toISOString() : undefined}
+              initialEnd={draft ? draft.end.toISOString() : undefined}
               onClose={closeForm}
             />
           )}

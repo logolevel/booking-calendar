@@ -50,10 +50,19 @@ function addHours(value: string, hours: number): string {
 interface Props {
   event?: EventDto;
   isAdmin: boolean;
+  // ISO strings used to prefill a new event created from a calendar slot.
+  initialStart?: string;
+  initialEnd?: string;
   onClose: () => void;
 }
 
-export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
+export function EventForm({
+  event,
+  isAdmin,
+  initialStart,
+  initialEnd,
+  onClose,
+}: Props): JSX.Element {
   const isEdit = Boolean(event);
   const [type, setType] = useState<EventType>(event?.type ?? EVENT_TYPE.MIXED);
   const [resourceId, setResourceId] = useState<ResourceId>(
@@ -87,13 +96,24 @@ export function EventForm({ event, isAdmin, onClose }: Props): JSX.Element {
     (t) => t !== EVENT_TYPE.GROUP || isAdmin || event?.type === EVENT_TYPE.GROUP,
   );
   const [startsAt, setStartsAt] = useState<string>(
-    event ? toLocalInput(event.startsAt) : currentHour(),
+    event
+      ? toLocalInput(event.startsAt)
+      : initialStart
+        ? toLocalInput(initialStart)
+        : currentHour(),
   );
   const [endsAt, setEndsAt] = useState<string>(
-    event ? toLocalInput(event.endsAt) : '',
+    event
+      ? toLocalInput(event.endsAt)
+      : initialEnd
+        ? toLocalInput(initialEnd)
+        : '',
   );
   // The end field stays disabled until the user actively sets the start.
-  const [startTouched, setStartTouched] = useState<boolean>(isEdit);
+  // A slot-prefilled draft already has both times, so treat it as touched.
+  const [startTouched, setStartTouched] = useState<boolean>(
+    isEdit || Boolean(initialStart),
+  );
 
   const createEvent = useCreateEvent();
   const updateEvent = useUpdateEvent();
