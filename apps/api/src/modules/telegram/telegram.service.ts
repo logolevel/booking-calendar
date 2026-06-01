@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import { SettingsService } from '../settings/settings.service';
 import type { TelegramUpdate } from './telegram.types';
@@ -18,6 +19,7 @@ export class TelegramService {
     private readonly config: ConfigService,
     private readonly access: AccessService,
     private readonly settings: SettingsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private get apiBase(): string {
@@ -102,6 +104,17 @@ export class TelegramService {
       return;
     }
 
+    if (text.startsWith('/get_open_hour')) {
+      const hour = await this.settings.getBookingOpenHour();
+      await this.sendMessage(chatId, `bookingOpenHour: ${hour}`);
+      return;
+    }
+
+    if (text.startsWith('/set_open_hour')) {
+      await this.handleSetOpenHour(chatId, fromId, text);
+      return;
+    }
+
     if (text.startsWith('/grant') || text.startsWith('/revoke')) {
       await this.handleAccessCommand(chatId, fromId, text);
     }
@@ -123,6 +136,40 @@ export class TelegramService {
     }
     await this.settings.setMaxDaysAhead(days);
     await this.sendMessage(chatId, `maxDaysAhead set to ${days}`);
+    await this.broadcastToUsers(
+      `📅 Період запису змінено: тепер можна бронювати на ${days} дн. наперед.`,
+    );
+  }
+
+  private async handleSetOpenHour(
+    chatId: number,
+    fromId: number,
+    text: string,
+  ): Promise<void> {
+    if (!this.isAdmin(fromId)) {
+      return;
+    }
+    const [, rawHour] = text.split(/\s+/, 2);
+    const hour = Number(rawHour);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+      await this.sendMessage(chatId, 'Usage: /set_open_hour <0..23>');
+      return;
+    }
+    await this.settings.setBookingOpenHour(hour);
+    await this.sendMessage(chatId, `bookingOpenHour set to ${hour}`);
+    const hh = String(hour).padStart(2, '0');
+    await this.broadcastToUsers(
+      `⏰ Час відкриття запису змінено: найдальніший день тепер відкривається о ${hh}:00.`,
+    );
+  }
+
+  // Best-effort private message to every registered user (skips those who
+  // never started the bot in a private chat — Telegram rejects those sends).
+  private async broadcastToUsers(text: string): Promise<void> {
+    const users = await this.prisma.user.findMany({ select: { id: true } });
+    for (const user of users) {
+      await this.sendMessage(Number(user.id), text);
+    }
   }
 
   private async handleAccessCommand(

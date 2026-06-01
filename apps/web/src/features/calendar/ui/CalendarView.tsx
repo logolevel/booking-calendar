@@ -26,7 +26,6 @@ import {
 } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import {
-  BOOKING_OPEN_HOUR,
   EVENT_TYPE,
   ROLE,
   type EventDto,
@@ -134,9 +133,14 @@ function shiftDate(date: Date, view: string, direction: 1 | -1): Date {
 interface Props {
   role: Role;
   maxDaysAhead: number;
+  bookingOpenHour: number;
 }
 
-export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
+export function CalendarView({
+  role,
+  maxDaysAhead,
+  bookingOpenHour,
+}: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
   const [view, setView] = useState<View>(getDefaultView);
   const [date, setDate] = useState<Date>(new Date());
@@ -158,7 +162,7 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
     }
     const now = new Date();
     const effectiveDaysAhead =
-      now.getHours() < BOOKING_OPEN_HOUR ? maxDaysAhead - 1 : maxDaysAhead;
+      now.getHours() < bookingOpenHour ? maxDaysAhead - 1 : maxDaysAhead;
     const today = startOfDay(now);
     const maxDate = startOfDay(addDays(today, effectiveDaysAhead));
     if (isBefore(day, today) || isAfter(startOfDay(day), maxDate)) {

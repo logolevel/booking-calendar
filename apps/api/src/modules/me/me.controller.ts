@@ -65,7 +65,10 @@ export class MeController {
     role: Role,
     isAdmin: boolean,
   ): Promise<MeResponse> {
-    const maxDaysAhead = await this.settings.getMaxDaysAhead();
+    const [maxDaysAhead, bookingOpenHour] = await Promise.all([
+      this.settings.getMaxDaysAhead(),
+      this.settings.getBookingOpenHour(),
+    ]);
     return {
       id: user.id,
       role,
@@ -76,6 +79,7 @@ export class MeController {
       gender: stored?.gender ?? null,
       profileComplete: Boolean(stored?.onboardedAt && stored.gender),
       maxDaysAhead,
+      bookingOpenHour,
     };
   }
 }

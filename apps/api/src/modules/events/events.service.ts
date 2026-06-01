@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import {
-  BOOKING_OPEN_HOUR,
   EVENT_TYPE,
   PARTICIPATION_ACTION,
   type EventDto,
@@ -230,13 +229,14 @@ export class EventsService {
 
   private async assertWithinDateLimit(startsAt: Date): Promise<void> {
     const maxDaysAhead = await this.settings.getMaxDaysAhead();
+    const openHour = await this.settings.getBookingOpenHour();
     const now = EventsService.kyivDayInfo(new Date());
     const target = EventsService.kyivDayInfo(startsAt);
 
-    // The newest day only opens at BOOKING_OPEN_HOUR; before that the window
+    // The newest day only opens at the configured hour; before that the window
     // is one day shorter, so popular slots aren't grabbed at midnight.
     const effectiveDaysAhead =
-      now.hour < BOOKING_OPEN_HOUR ? maxDaysAhead - 1 : maxDaysAhead;
+      now.hour < openHour ? maxDaysAhead - 1 : maxDaysAhead;
     const maxDayIndex = now.dayIndex + effectiveDaysAhead;
 
     if (target.dayIndex < now.dayIndex || target.dayIndex > maxDayIndex) {

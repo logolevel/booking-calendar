@@ -65,6 +65,8 @@ export interface MeResponse {
   // Onboarding done: name + gender provided.
   profileComplete: boolean;
   maxDaysAhead: number;
+  // Local hour (Europe/Kyiv) when the furthest bookable day opens.
+  bookingOpenHour: number;
 }
 
 export interface OnboardingRequest {
