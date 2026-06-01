@@ -165,7 +165,7 @@ export class TelegramService {
 
   // Best-effort private message to every registered user (skips those who
   // never started the bot in a private chat — Telegram rejects those sends).
-  private async broadcastToUsers(text: string): Promise<void> {
+  async broadcastToUsers(text: string): Promise<void> {
     const users = await this.prisma.user.findMany({ select: { id: true } });
     for (const user of users) {
       await this.sendMessage(Number(user.id), text);

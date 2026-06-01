@@ -10,6 +10,7 @@ import { EventsModule } from './modules/events/events.module';
 import { UsersModule } from './modules/users/users.module';
 import { GuestsModule } from './modules/guests/guests.module';
 import { ParticipationModule } from './modules/participation/participation.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ParticipationModule } from './modules/participation/participation.modul
     UsersModule,
     GuestsModule,
     ParticipationModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

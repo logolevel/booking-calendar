@@ -75,6 +75,18 @@ export interface OnboardingRequest {
   gender: Gender;
 }
 
+export interface AdminSettingsResponse {
+  maxDaysAhead: number;
+  bookingOpenHour: number;
+}
+
+export interface UpdateAdminSettingsRequest {
+  maxDaysAhead: number;
+  bookingOpenHour: number;
+  // When true, broadcast the changes to every registered user.
+  notify: boolean;
+}
+
 // Header used by an admin to preview the app as another role.
 export const PREVIEW_ROLE_HEADER = 'x-preview-role';
 

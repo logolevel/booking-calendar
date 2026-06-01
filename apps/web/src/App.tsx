@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ROLE, type Role } from '@tg-calendar/shared-types';
 import { useMe } from './features/auth/useMe';
 import { usePreviewRole } from './features/auth/usePreviewRole';
@@ -5,6 +6,7 @@ import { RoleSwitch } from './features/auth/ui/RoleSwitch';
 import { ApiError } from './shared/api/client';
 import { CalendarView } from './features/calendar/ui/CalendarView';
 import { OnboardingForm } from './features/onboarding/ui/OnboardingForm';
+import { SettingsSheet } from './features/admin/ui/SettingsSheet';
 
 const ROLE_LABELS: Record<Role, string> = {
   [ROLE.ADMIN]: 'Адмін',
@@ -37,6 +39,7 @@ function StateScreen({
 export function App(): JSX.Element {
   const { data: me, isLoading, error } = useMe();
   const { preview, setPreview } = usePreviewRole();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -78,14 +81,26 @@ export function App(): JSX.Element {
       <header className="app__header">
         <span className="app__title">Календар</span>
         {me.isAdmin ? (
-          <RoleSwitch
-            value={preview ?? ROLE.ADMIN}
-            onChange={(role) => setPreview(role === ROLE.ADMIN ? null : role)}
-          />
+          <div className="app__header-actions">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Налаштування"
+              onClick={() => setSettingsOpen(true)}
+            >
+              ⚙️
+            </button>
+            <RoleSwitch
+              value={preview ?? ROLE.ADMIN}
+              onChange={(role) => setPreview(role === ROLE.ADMIN ? null : role)}
+            />
+          </div>
         ) : (
           <span className="chip chip--accent">{ROLE_LABELS[me.role]}</span>
         )}
       </header>
+
+      {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       <main className="app__main">
         {isPreviewing && (
           <div className="preview-bar">
