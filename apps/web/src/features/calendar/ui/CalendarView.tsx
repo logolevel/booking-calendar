@@ -270,7 +270,7 @@ export function CalendarView({ role, maxDaysAhead }: Props): JSX.Element {
         onSelectEvent={openDetails}
         selectable={canCreate}
         onSelectSlot={onSelectSlot}
-        longPressThreshold={250}
+        longPressThreshold={20}
         views={calendarViews}
         components={calendarComponents}
         dayPropGetter={dayPropGetter}
