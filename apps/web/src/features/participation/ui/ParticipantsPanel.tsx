@@ -3,11 +3,14 @@ import { format } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import {
   EVENT_TYPE,
+  GENDER,
   type EventDto,
+  type Gender,
   type ParticipationLogDto,
 } from '@tg-calendar/shared-types';
 import { eventTypeLabel, resourceLabel } from '../../calendar/eventLabels';
 import { Button } from '../../../shared/ui/Button';
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog';
 import { PersonName } from '../../../shared/ui/PersonName';
 import {
   useEventParticipants,
@@ -23,16 +26,30 @@ const RESOURCE_COLOR: Record<number, string> = {
   2: 'var(--resource-2)',
 };
 
+// Choose the verb form by gender; fall back to masculine when unknown.
+function genderVerb(
+  gender: Gender | null,
+  male: string,
+  female: string,
+): string {
+  return gender === GENDER.FEMALE ? female : male;
+}
+
 function logText(entry: ParticipationLogDto): string {
+  const g = entry.actorGender;
   switch (entry.action) {
     case 'join':
-      return `${entry.actorName} записався`;
+      return `${entry.actorName} ${genderVerb(g, 'записався', 'записалася')}`;
     case 'add':
-      return `${entry.actorName} додав(ла) ${entry.targetName ?? ''}`.trim();
+      return `${entry.actorName} ${genderVerb(g, 'додав', 'додала')} ${
+        entry.targetName ?? ''
+      }`.trim();
     case 'leave':
-      return `${entry.actorName} вийшов`;
+      return `${entry.actorName} ${genderVerb(g, 'вийшов', 'вийшла')}`;
     case 'remove':
-      return `${entry.actorName} видалив(ла) ${entry.targetName ?? ''}`.trim();
+      return `${entry.actorName} ${genderVerb(g, 'видалив', 'видалила')} ${
+        entry.targetName ?? ''
+      }`.trim();
     case 'promoted':
       return `${entry.targetName ?? entry.actorName} — з черги`;
     default:
@@ -56,6 +73,12 @@ export function ParticipantsPanel({
   const actions = useParticipationActions(event.id);
   const deleteEvent = useDeleteEvent();
 
+  // A pending confirmation: its message and the action to run on "Так".
+  const [confirm, setConfirm] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
   // The event vanishes when its last member leaves; close the sheet then.
   const closeIfDeleted = (res: { deleted?: boolean }): void => {
     if (res.deleted) {
@@ -63,25 +86,38 @@ export function ParticipantsPanel({
     }
   };
 
-  const removeEvent = (): void => {
-    deleteEvent.mutate(event.id, { onSuccess: onClose });
+  const askLeave = (): void => {
+    setConfirm({
+      message: 'Ви дійсно хочете вийти з події?',
+      onConfirm: () =>
+        actions.leave.mutate(undefined, { onSuccess: closeIfDeleted }),
+    });
   };
 
-  const confirmDelete = (): void => {
-    const message = 'Видалити подію? Цю дію не можна скасувати.';
-    const tg = window.Telegram?.WebApp;
-    if (tg?.showConfirm) {
-      tg.showConfirm(message, (ok) => {
-        if (ok) {
-          removeEvent();
-        }
-      });
-      return;
-    }
-    if (window.confirm(message)) {
-      removeEvent();
-    }
+  const askRemove = (participantId: string, name: string, isSelf: boolean): void => {
+    setConfirm({
+      message: isSelf
+        ? 'Ви дійсно хочете вийти з події?'
+        : `Ви дійсно хочете прибрати ${name} з події?`,
+      onConfirm: () =>
+        actions.remove.mutate(participantId, { onSuccess: closeIfDeleted }),
+    });
   };
+
+  const askUnqueue = (): void => {
+    setConfirm({
+      message: 'Ви дійсно хочете вийти з черги?',
+      onConfirm: () => actions.unqueue.mutate(),
+    });
+  };
+
+  const askDelete = (): void => {
+    setConfirm({
+      message: 'Ви дійсно хочете видалити подію? Цю дію не можна скасувати.',
+      onConfirm: () => deleteEvent.mutate(event.id, { onSuccess: onClose }),
+    });
+  };
+
   const [query, setQuery] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const search = useUserSearch(query);
@@ -103,9 +139,7 @@ export function ParticipantsPanel({
           variant="secondary"
           block
           disabled={actions.isPending}
-          onClick={() =>
-            actions.leave.mutate(undefined, { onSuccess: closeIfDeleted })
-          }
+          onClick={askLeave}
         >
           Вийти
         </Button>
@@ -117,7 +151,7 @@ export function ParticipantsPanel({
           variant="secondary"
           block
           disabled={actions.isPending}
-          onClick={() => actions.unqueue.mutate()}
+          onClick={askUnqueue}
         >
           Вийти з черги
         </Button>
@@ -231,7 +265,8 @@ export function ParticipantsPanel({
                   {p.userId !== p.addedByUserId && (
                     <span className="participants__by">
                       {' '}
-                      · додав(ла) {p.addedByName}
+                      · {genderVerb(p.addedByGender, 'додав', 'додала')}{' '}
+                      {p.addedByName}
                     </span>
                   )}
                 </span>
@@ -241,9 +276,7 @@ export function ParticipantsPanel({
                     className="participants__remove"
                     aria-label="Прибрати"
                     disabled={actions.isPending}
-                    onClick={() =>
-                      actions.remove.mutate(p.id, { onSuccess: closeIfDeleted })
-                    }
+                    onClick={() => askRemove(p.id, p.name, p.isSelf)}
                   >
                     ✕
                   </button>
@@ -328,7 +361,7 @@ export function ParticipantsPanel({
                         className="participants__remove"
                         aria-label="Вийти з черги"
                         disabled={actions.isPending}
-                        onClick={() => actions.unqueue.mutate()}
+                        onClick={askUnqueue}
                       >
                         ✕
                       </button>
@@ -375,11 +408,22 @@ export function ParticipantsPanel({
             block
             className="btn--danger"
             disabled={deleteEvent.isPending}
-            onClick={confirmDelete}
+            onClick={askDelete}
           >
             Видалити подію
           </Button>
         </div>
+      )}
+
+      {confirm && (
+        <ConfirmDialog
+          message={confirm.message}
+          onConfirm={() => {
+            confirm.onConfirm();
+            setConfirm(null);
+          }}
+          onCancel={() => setConfirm(null)}
+        />
       )}
     </div>
   );

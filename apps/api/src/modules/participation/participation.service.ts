@@ -114,6 +114,15 @@ export class ParticipationService {
     return Number(h) * 60 + Number(m);
   }
 
+  // Pick the verb form by gender; fall back to masculine when unknown.
+  private static genderVerb(
+    gender: string | null,
+    male: string,
+    female: string,
+  ): string {
+    return gender === 'female' ? female : male;
+  }
+
   // True when an event (start/end minutes-of-day) overlaps the prime window.
   private static overlapsPrime(
     startMin: number,
@@ -448,14 +457,19 @@ export class ParticipationService {
     const profiles = await this.users.getProfileMap([actorId, targetUserId]);
     const label = await this.eventLabel(eventId);
     const actorName = profiles.get(actorId)?.name ?? 'Учасник';
+    const added = ParticipationService.genderVerb(
+      profiles.get(actorId)?.gender ?? null,
+      'додав',
+      'додала',
+    );
     await this.telegram.notifyUser(
       targetUserId,
-      `Вас додав(ла) ${actorName} на ${label}`,
+      `Вас ${added} ${actorName} на ${label}`,
     );
     if (role !== Role.admin) {
       const targetName = profiles.get(targetUserId)?.name ?? 'учасника';
       await this.telegram.notifyAdmin(
-        `${actorName} додав(ла) ${targetName} на ${label}`,
+        `${actorName} ${added} ${targetName} на ${label}`,
       );
     }
   }
@@ -785,6 +799,7 @@ export class ParticipationService {
           isGuest: p.guestId != null,
           addedByUserId: Number(p.addedByUserId),
           addedByName: nameOf(Number(p.addedByUserId)),
+          addedByGender: profiles.get(Number(p.addedByUserId))?.gender ?? null,
           isSelf,
           canRemove: role === Role.admin || p.addedByUserId === actor || isSelf,
           joinedAt: p.joinedAt.toISOString(),
@@ -805,6 +820,7 @@ export class ParticipationService {
         id: l.id,
         action: l.action as ParticipationAction,
         actorName: nameOf(Number(l.actorUserId)),
+        actorGender: profiles.get(Number(l.actorUserId))?.gender ?? null,
         targetName:
           l.targetUserId != null
             ? nameOf(Number(l.targetUserId))

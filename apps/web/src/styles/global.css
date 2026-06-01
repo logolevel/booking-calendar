@@ -391,6 +391,40 @@ button {
   animation: slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade-in 0.16s ease;
+}
+
+.confirm {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  animation: slide-up 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.confirm__message {
+  margin: 0 0 18px;
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.confirm__actions {
+  display: flex;
+  gap: 10px;
+}
+
 .sheet__handle {
   width: 40px;
   height: 4px;
@@ -875,6 +909,15 @@ button {
   font-weight: 600;
   color: var(--subtitle);
   border-bottom: 1px solid var(--border);
+}
+
+/* Month view weekday row: match the week view's compact uppercase style. */
+.rbc-month-header .rbc-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--hint);
 }
 
 /* Google-Calendar-style day headers (weekday on top, big date below) */

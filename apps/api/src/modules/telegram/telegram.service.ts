@@ -159,7 +159,7 @@ export class TelegramService {
     await this.sendMessage(chatId, `bookingOpenHour set to ${hour}`);
     const hh = String(hour).padStart(2, '0');
     await this.broadcastToUsers(
-      `⏰ Час відкриття запису змінено: найдальніший день тепер відкривається о ${hh}:00.`,
+      `⏰ Час відкриття запису змінено: новий день для запису тепер відкривається о ${hh}:00.`,
     );
   }
 

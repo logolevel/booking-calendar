@@ -104,6 +104,11 @@ const calendarComponents = {
   [THREE_DAY_VIEW]: { header: CalendarDayHeader },
 } as unknown as CalendarProps['components'];
 
+// Month view weekday row: short two-letter names (пн, вт …) like the week view.
+const calendarFormats: CalendarProps['formats'] = {
+  weekdayFormat: (date, culture, l) => l?.format(date, 'EEEEEE', culture) ?? '',
+};
+
 // Tab order; "Список" (agenda) sits last, after "Місяць".
 const calendarViews = {
   day: true,
@@ -281,6 +286,7 @@ export function CalendarView({
         onSelectSlot={onSelectSlot}
         longPressThreshold={250}
         views={calendarViews}
+        formats={calendarFormats}
         components={calendarComponents}
         dayPropGetter={dayPropGetter}
         min={new Date(1970, 0, 1, 8, 0, 0)}

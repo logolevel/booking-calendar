@@ -83,7 +83,7 @@ export class AdminController {
     if (next.bookingOpenHour !== prev.bookingOpenHour) {
       const hh = String(next.bookingOpenHour).padStart(2, '0');
       await this.telegram.broadcastToUsers(
-        `⏰ Час відкриття запису змінено: найдальніший день тепер відкривається о ${hh}:00.`,
+        `⏰ Час відкриття запису змінено: новий день для запису тепер відкривається о ${hh}:00.`,
       );
     }
     if (

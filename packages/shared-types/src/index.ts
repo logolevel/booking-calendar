@@ -163,6 +163,8 @@ export interface ParticipantDto {
   isGuest: boolean;
   addedByUserId: number;
   addedByName: string;
+  // Gender of the user who added this participant (for verb agreement).
+  addedByGender: Gender | null;
   isSelf: boolean;
   canRemove: boolean;
   joinedAt: string;
@@ -181,6 +183,8 @@ export interface ParticipationLogDto {
   id: string;
   action: ParticipationAction;
   actorName: string;
+  // Gender of the actor (for choosing the correct verb form).
+  actorGender: Gender | null;
   targetName: string | null;
   at: string;
 }
