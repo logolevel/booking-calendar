@@ -32,7 +32,19 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    throw new ApiError(res.status, `Request failed with status ${res.status}`);
+    // Surface the server's message (NestJS sends { message }) when present.
+    let message = `Request failed with status ${res.status}`;
+    try {
+      const data = (await res.json()) as { message?: string | string[] };
+      if (Array.isArray(data.message)) {
+        message = data.message.join(', ');
+      } else if (typeof data.message === 'string' && data.message) {
+        message = data.message;
+      }
+    } catch {
+      // No JSON body; keep the default message.
+    }
+    throw new ApiError(res.status, message);
   }
 
   // No-content responses (e.g. 204 from DELETE) have no JSON body.

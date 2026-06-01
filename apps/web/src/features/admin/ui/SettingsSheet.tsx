@@ -25,6 +25,8 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
 
   const [maxDaysAhead, setMaxDaysAhead] = useState<number>(7);
   const [bookingOpenHour, setBookingOpenHour] = useState<number>(10);
+  const [primeStart, setPrimeStart] = useState<string>('18:30');
+  const [primeEnd, setPrimeEnd] = useState<string>('20:30');
   const [notify, setNotify] = useState<boolean>(true);
 
   // Seed the form once the current settings arrive.
@@ -32,13 +34,20 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
     if (data) {
       setMaxDaysAhead(data.maxDaysAhead);
       setBookingOpenHour(data.bookingOpenHour);
+      setPrimeStart(data.primeStart);
+      setPrimeEnd(data.primeEnd);
     }
   }, [data]);
 
+  const primeInvalid = primeStart >= primeEnd;
+
   const submit = (e: FormEvent): void => {
     e.preventDefault();
+    if (primeInvalid) {
+      return;
+    }
     update.mutate(
-      { maxDaysAhead, bookingOpenHour, notify },
+      { maxDaysAhead, bookingOpenHour, primeStart, primeEnd, notify },
       { onSuccess: onClose },
     );
   };
@@ -80,6 +89,30 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
             </select>
           </label>
 
+          <div className="field">
+            <span className="field__label">Прайм-тайм</span>
+            <div className="settings__range">
+              <input
+                type="time"
+                step={1800}
+                value={primeStart}
+                onChange={(e) => setPrimeStart(e.target.value)}
+              />
+              <span className="settings__range-dash">–</span>
+              <input
+                type="time"
+                step={1800}
+                value={primeEnd}
+                onChange={(e) => setPrimeEnd(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <p className="field__hint">
+            У прайм-тайм: не більше 2 записів на тиждень, із них не більше 1 на
+            зелений майданчик.
+          </p>
+
           <label className="participants__checkbox field">
             <input
               type="checkbox"
@@ -89,6 +122,11 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
             Сповістити всіх учасників
           </label>
 
+          {primeInvalid && (
+            <p className="form__error">
+              Початок прайм-тайму має бути раніше за кінець.
+            </p>
+          )}
           {update.isError && (
             <p className="form__error">Не вдалося зберегти налаштування.</p>
           )}
@@ -97,7 +135,11 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
             <Button variant="secondary" block onClick={onClose}>
               Скасувати
             </Button>
-            <Button type="submit" block disabled={update.isPending}>
+            <Button
+              type="submit"
+              block
+              disabled={update.isPending || primeInvalid}
+            >
               Зберегти
             </Button>
           </div>

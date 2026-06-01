@@ -223,6 +223,26 @@ button {
   gap: 8px;
 }
 
+.settings__range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings__range input {
+  flex: 1;
+}
+
+.settings__range-dash {
+  color: var(--hint);
+}
+
+.field__hint {
+  margin: -6px 0 14px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

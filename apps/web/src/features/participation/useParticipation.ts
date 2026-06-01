@@ -76,6 +76,18 @@ export function useParticipationActions(eventId: string) {
     queue.isPending ||
     unqueue.isPending;
 
+  // The most recent failing action (e.g. prime-time quota) for display.
+  const error =
+    join.error ||
+    add.error ||
+    addGuest.error ||
+    createNewGuest.error ||
+    queue.error ||
+    leave.error ||
+    remove.error ||
+    unqueue.error ||
+    null;
+
   return {
     join,
     leave,
@@ -86,6 +98,7 @@ export function useParticipationActions(eventId: string) {
     queue,
     unqueue,
     isPending,
+    error,
   };
 }
 

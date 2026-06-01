@@ -255,6 +255,10 @@ export function ParticipantsPanel({
             )}
           </ul>
 
+          {!ended && actions.error && (
+            <p className="form__error">{actions.error.message}</p>
+          )}
+
           {!ended && renderSelfAction()}
 
           {!ended && (data.isAdmin || data.isParticipant) && (

@@ -40,6 +40,13 @@ export const DEFAULT_MAX_DAYS_AHEAD = 7;
 // (Europe/Kyiv) instead of midnight, to avoid a midnight sign-up rush.
 export const BOOKING_OPEN_HOUR = 10;
 
+// Prime time is the busiest window (Europe/Kyiv). Each user may book at most
+// two prime-time slots per week, with at most one of them on the green court.
+export const PRIME_TIME_DEFAULT_START = '18:30';
+export const PRIME_TIME_DEFAULT_END = '20:30';
+export const PRIME_TIME_MAX_PER_WEEK = 2;
+export const PRIME_TIME_MAX_GREEN_PER_WEEK = 1;
+
 export interface TelegramUser {
   id: number;
   firstName: string;
@@ -78,11 +85,16 @@ export interface OnboardingRequest {
 export interface AdminSettingsResponse {
   maxDaysAhead: number;
   bookingOpenHour: number;
+  // Prime-time window as "HH:MM" strings in Europe/Kyiv.
+  primeStart: string;
+  primeEnd: string;
 }
 
 export interface UpdateAdminSettingsRequest {
   maxDaysAhead: number;
   bookingOpenHour: number;
+  primeStart: string;
+  primeEnd: string;
   // When true, broadcast the changes to every registered user.
   notify: boolean;
 }

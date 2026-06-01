@@ -8,6 +8,8 @@ import {
 import { Prisma, Role } from '@prisma/client';
 import {
   PARTICIPATION_ACTION,
+  PRIME_TIME_MAX_GREEN_PER_WEEK,
+  PRIME_TIME_MAX_PER_WEEK,
   type EventParticipantsResponse,
   type ParticipationAction,
 } from '@tg-calendar/shared-types';
@@ -15,8 +17,21 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { GuestsService } from '../guests/guests.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { SettingsService } from '../settings/settings.service';
 
 type Tx = Prisma.TransactionClient;
+
+interface LockedEvent {
+  capacity: number;
+  createdBy: bigint;
+  allowEmpty: boolean;
+  startsAt: Date;
+  endsAt: Date;
+  resourceId: number;
+}
+
+// The green court id; prime-time green bookings are capped at one per week.
+const GREEN_RESOURCE_ID = 1;
 
 @Injectable()
 export class ParticipationService {
@@ -25,6 +40,7 @@ export class ParticipationService {
     private readonly users: UsersService,
     private readonly guests: GuestsService,
     private readonly telegram: TelegramService,
+    private readonly settings: SettingsService,
   ) {}
 
   // Human-readable event label for push notifications (court time zone).
@@ -47,24 +63,10 @@ export class ParticipationService {
 
   // Lock the event row for the duration of the transaction to avoid two
   // clients grabbing the last seat at the same time.
-  private async lockEvent(
-    tx: Tx,
-    eventId: string,
-  ): Promise<{
-    capacity: number;
-    createdBy: bigint;
-    allowEmpty: boolean;
-    endsAt: Date;
-  }> {
-    const rows = await tx.$queryRaw<
-      {
-        capacity: number;
-        createdBy: bigint;
-        allowEmpty: boolean;
-        endsAt: Date;
-      }[]
-    >`
-      SELECT "capacity", "createdBy", "allowEmpty", "endsAt" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
+  private async lockEvent(tx: Tx, eventId: string): Promise<LockedEvent> {
+    const rows = await tx.$queryRaw<LockedEvent[]>`
+      SELECT "capacity", "createdBy", "allowEmpty", "startsAt", "endsAt", "resourceId"
+      FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
     `;
     const event = rows[0];
     if (!event) {
@@ -77,6 +79,127 @@ export class ParticipationService {
   private assertActive(endsAt: Date): void {
     if (endsAt.getTime() <= Date.now()) {
       throw new ForbiddenException('Event has already ended');
+    }
+  }
+
+  // Calendar day index (epoch days) and minutes-of-day in Kyiv, so prime-time
+  // and week math are correct regardless of the server time zone.
+  private static kyivParts(date: Date): { dayIndex: number; minutes: number } {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Kyiv',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const get = (type: string): number =>
+      Number(parts.find((p) => p.type === type)?.value ?? '0');
+    const dayIndex = Math.floor(
+      Date.UTC(get('year'), get('month') - 1, get('day')) / 86_400_000,
+    );
+    return { dayIndex, minutes: get('hour') * 60 + get('minute') };
+  }
+
+  // Monday-based week key for a given epoch day index (1970-01-01 was Thu).
+  private static weekKey(dayIndex: number): number {
+    const dowSunday0 = (dayIndex + 4) % 7;
+    const offsetToMonday = (dowSunday0 + 6) % 7;
+    return dayIndex - offsetToMonday;
+  }
+
+  private static toMinutes(hhmm: string): number {
+    const [h, m] = hhmm.split(':');
+    return Number(h) * 60 + Number(m);
+  }
+
+  // True when an event (start/end minutes-of-day) overlaps the prime window.
+  private static overlapsPrime(
+    startMin: number,
+    endMin: number,
+    primeStart: number,
+    primeEnd: number,
+  ): boolean {
+    return startMin < primeEnd && endMin > primeStart;
+  }
+
+  // Enforce the weekly prime-time quota for the user that is being booked:
+  // at most PRIME_TIME_MAX_PER_WEEK prime slots per week, of which at most
+  // PRIME_TIME_MAX_GREEN_PER_WEEK may be on the green court.
+  private async assertPrimeQuota(
+    tx: Tx,
+    eventId: string,
+    userId: number,
+    event: LockedEvent,
+  ): Promise<void> {
+    const [primeStartStr, primeEndStr] = await Promise.all([
+      this.settings.getPrimeStart(),
+      this.settings.getPrimeEnd(),
+    ]);
+    const primeStart = ParticipationService.toMinutes(primeStartStr);
+    const primeEnd = ParticipationService.toMinutes(primeEndStr);
+
+    const target = ParticipationService.kyivParts(event.startsAt);
+    const targetEnd = ParticipationService.kyivParts(event.endsAt);
+    // Nothing to enforce unless the new booking itself falls in prime time.
+    if (
+      !ParticipationService.overlapsPrime(
+        target.minutes,
+        targetEnd.minutes,
+        primeStart,
+        primeEnd,
+      )
+    ) {
+      return;
+    }
+
+    const targetWeek = ParticipationService.weekKey(target.dayIndex);
+    // Over-fetch a two-week window, then filter to the exact Kyiv week.
+    const from = new Date(event.startsAt.getTime() - 8 * 86_400_000);
+    const to = new Date(event.startsAt.getTime() + 8 * 86_400_000);
+    const rows = await tx.eventParticipant.findMany({
+      where: {
+        userId: BigInt(userId),
+        eventId: { not: eventId },
+        event: { startsAt: { gte: from, lte: to } },
+      },
+      include: {
+        event: { select: { startsAt: true, endsAt: true, resourceId: true } },
+      },
+    });
+
+    let primeCount = 0;
+    let greenCount = 0;
+    for (const row of rows) {
+      const s = ParticipationService.kyivParts(row.event.startsAt);
+      const e = ParticipationService.kyivParts(row.event.endsAt);
+      if (ParticipationService.weekKey(s.dayIndex) !== targetWeek) {
+        continue;
+      }
+      if (
+        !ParticipationService.overlapsPrime(s.minutes, e.minutes, primeStart, primeEnd)
+      ) {
+        continue;
+      }
+      primeCount += 1;
+      if (row.event.resourceId === GREEN_RESOURCE_ID) {
+        greenCount += 1;
+      }
+    }
+
+    if (primeCount >= PRIME_TIME_MAX_PER_WEEK) {
+      throw new ForbiddenException(
+        `У прайм-тайм можна записатися не більше ${PRIME_TIME_MAX_PER_WEEK} разів на тиждень.`,
+      );
+    }
+    if (
+      event.resourceId === GREEN_RESOURCE_ID &&
+      greenCount >= PRIME_TIME_MAX_GREEN_PER_WEEK
+    ) {
+      throw new ForbiddenException(
+        'На зелений майданчик у прайм-тайм можна записатися лише раз на тиждень. Оберіть червоний майданчик.',
+      );
     }
   }
 
@@ -198,6 +321,7 @@ export class ParticipationService {
       if (count >= event.capacity) {
         throw new ConflictException('Event is full');
       }
+      await this.assertPrimeQuota(tx, eventId, actorId, event);
       await tx.eventParticipant.create({
         data: {
           eventId,
@@ -261,6 +385,9 @@ export class ParticipationService {
       if (count >= event.capacity) {
         throw new ConflictException('Event is full');
       }
+
+      // The prime-time quota applies to the person being booked.
+      await this.assertPrimeQuota(tx, eventId, targetUserId, event);
 
       await tx.eventParticipant.create({
         data: {
@@ -504,6 +631,7 @@ export class ParticipationService {
       const count = await tx.eventParticipant.count({ where: { eventId } });
       if (count < event.capacity) {
         // There is space — join directly instead of waiting.
+        await this.assertPrimeQuota(tx, eventId, actorId, event);
         await tx.eventParticipant.create({
           data: {
             eventId,

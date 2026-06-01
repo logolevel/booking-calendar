@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -40,14 +41,31 @@ export class AdminController {
   ): Promise<AdminSettingsResponse> {
     await this.assertAdmin(user.id);
 
+    if (this.toMinutes(dto.primeStart) >= this.toMinutes(dto.primeEnd)) {
+      throw new BadRequestException('primeStart must be before primeEnd');
+    }
+
     const prev = await this.current();
     await this.settings.setMaxDaysAhead(dto.maxDaysAhead);
     await this.settings.setBookingOpenHour(dto.bookingOpenHour);
+    await this.settings.setPrimeStart(dto.primeStart);
+    await this.settings.setPrimeEnd(dto.primeEnd);
 
+    const next: AdminSettingsResponse = {
+      maxDaysAhead: dto.maxDaysAhead,
+      bookingOpenHour: dto.bookingOpenHour,
+      primeStart: dto.primeStart,
+      primeEnd: dto.primeEnd,
+    };
     if (dto.notify) {
-      await this.notifyChanges(prev, dto);
+      await this.notifyChanges(prev, next);
     }
-    return { maxDaysAhead: dto.maxDaysAhead, bookingOpenHour: dto.bookingOpenHour };
+    return next;
+  }
+
+  private toMinutes(hhmm: string): number {
+    const [h, m] = hhmm.split(':');
+    return Number(h) * 60 + Number(m);
   }
 
   // Broadcast only the values that actually changed.
@@ -66,14 +84,25 @@ export class AdminController {
         `⏰ Час відкриття запису змінено: найдальніший день тепер відкривається о ${hh}:00.`,
       );
     }
+    if (
+      next.primeStart !== prev.primeStart ||
+      next.primeEnd !== prev.primeEnd
+    ) {
+      await this.telegram.broadcastToUsers(
+        `🔥 Прайм-тайм змінено: тепер ${next.primeStart}–${next.primeEnd}.`,
+      );
+    }
   }
 
   private async current(): Promise<AdminSettingsResponse> {
-    const [maxDaysAhead, bookingOpenHour] = await Promise.all([
-      this.settings.getMaxDaysAhead(),
-      this.settings.getBookingOpenHour(),
-    ]);
-    return { maxDaysAhead, bookingOpenHour };
+    const [maxDaysAhead, bookingOpenHour, primeStart, primeEnd] =
+      await Promise.all([
+        this.settings.getMaxDaysAhead(),
+        this.settings.getBookingOpenHour(),
+        this.settings.getPrimeStart(),
+        this.settings.getPrimeEnd(),
+      ]);
+    return { maxDaysAhead, bookingOpenHour, primeStart, primeEnd };
   }
 
   private async assertAdmin(userId: number): Promise<void> {
