@@ -4,6 +4,7 @@ import {
   DEFAULT_MAX_DAYS_AHEAD,
   PRIME_TIME_DEFAULT_END,
   PRIME_TIME_DEFAULT_START,
+  PRIME_TIME_OVERFLOW_HOUR,
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -11,6 +12,7 @@ const MAX_DAYS_AHEAD_KEY = 'maxDaysAhead';
 const BOOKING_OPEN_HOUR_KEY = 'bookingOpenHour';
 const PRIME_START_KEY = 'primeStart';
 const PRIME_END_KEY = 'primeEnd';
+const PRIME_OVERFLOW_HOUR_KEY = 'primeOverflowHour';
 
 const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -76,6 +78,28 @@ export class SettingsService {
 
   async setPrimeEnd(value: string): Promise<void> {
     await this.setTime(PRIME_END_KEY, value);
+  }
+
+  async getPrimeOverflowHour(): Promise<number> {
+    const setting = await this.prisma.setting.findUnique({
+      where: { key: PRIME_OVERFLOW_HOUR_KEY },
+    });
+    if (!setting) {
+      return PRIME_TIME_OVERFLOW_HOUR;
+    }
+    const parsed = Number(setting.value);
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23
+      ? parsed
+      : PRIME_TIME_OVERFLOW_HOUR;
+  }
+
+  async setPrimeOverflowHour(hour: number): Promise<void> {
+    const value = String(hour);
+    await this.prisma.setting.upsert({
+      where: { key: PRIME_OVERFLOW_HOUR_KEY },
+      create: { key: PRIME_OVERFLOW_HOUR_KEY, value },
+      update: { value },
+    });
   }
 
   private async getTime(key: string, fallback: string): Promise<string> {

@@ -27,6 +27,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
   const [bookingOpenHour, setBookingOpenHour] = useState<number>(10);
   const [primeStart, setPrimeStart] = useState<string>('18:30');
   const [primeEnd, setPrimeEnd] = useState<string>('20:30');
+  const [primeOverflowHour, setPrimeOverflowHour] = useState<number>(12);
   const [notify, setNotify] = useState<boolean>(true);
 
   // Seed the form once the current settings arrive.
@@ -36,6 +37,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
       setBookingOpenHour(data.bookingOpenHour);
       setPrimeStart(data.primeStart);
       setPrimeEnd(data.primeEnd);
+      setPrimeOverflowHour(data.primeOverflowHour);
     }
   }, [data]);
 
@@ -47,7 +49,14 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
       return;
     }
     update.mutate(
-      { maxDaysAhead, bookingOpenHour, primeStart, primeEnd, notify },
+      {
+        maxDaysAhead,
+        bookingOpenHour,
+        primeStart,
+        primeEnd,
+        primeOverflowHour,
+        notify,
+      },
       { onSuccess: onClose },
     );
   };
@@ -111,6 +120,27 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
           <p className="field__hint">
             У прайм-тайм: не більше 2 записів на тиждень, із них не більше 1 на
             зелений майданчик.
+          </p>
+
+          <label className="field">
+            <span className="field__label">
+              Додатковий запис у день події з
+            </span>
+            <select
+              value={primeOverflowHour}
+              onChange={(e) => setPrimeOverflowHour(Number(e.target.value))}
+            >
+              {HOUR_OPTIONS.map((h) => (
+                <option key={h} value={h}>
+                  {String(h).padStart(2, '0')}:00
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className="field__hint">
+            У день події з цієї години ліміт прайм-тайму знімається — можна
+            зайняти вільні місця або стати в чергу.
           </p>
 
           <label className="participants__checkbox field">

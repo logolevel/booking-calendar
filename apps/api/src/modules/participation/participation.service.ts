@@ -124,18 +124,33 @@ export class ParticipationService {
     return startMin < primeEnd && endMin > primeStart;
   }
 
-  // Enforce the weekly prime-time quota for the user that is being booked:
-  // at most PRIME_TIME_MAX_PER_WEEK prime slots per week, of which at most
-  // PRIME_TIME_MAX_GREEN_PER_WEEK may be on the green court.
+  // Throwing wrapper around the eligibility check.
   private async assertPrimeQuota(
     tx: Tx,
     eventId: string,
     userId: number,
     event: LockedEvent,
   ): Promise<void> {
-    const [primeStartStr, primeEndStr] = await Promise.all([
+    const result = await this.checkPrimeQuota(tx, eventId, userId, event);
+    if (!result.ok) {
+      throw new ForbiddenException(result.reason);
+    }
+  }
+
+  // Weekly prime-time quota for the user being booked: at most
+  // PRIME_TIME_MAX_PER_WEEK prime slots per week, of which at most
+  // PRIME_TIME_MAX_GREEN_PER_WEEK may be on the green court. On the event's
+  // own day, from the overflow hour, the cap is lifted (last-minute spots).
+  private async checkPrimeQuota(
+    tx: Tx,
+    eventId: string,
+    userId: number,
+    event: LockedEvent,
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const [primeStartStr, primeEndStr, overflowHour] = await Promise.all([
       this.settings.getPrimeStart(),
       this.settings.getPrimeEnd(),
+      this.settings.getPrimeOverflowHour(),
     ]);
     const primeStart = ParticipationService.toMinutes(primeStartStr);
     const primeEnd = ParticipationService.toMinutes(primeEndStr);
@@ -151,7 +166,13 @@ export class ParticipationService {
         primeEnd,
       )
     ) {
-      return;
+      return { ok: true };
+    }
+
+    // Same-day overflow window: the weekly cap no longer applies.
+    const now = ParticipationService.kyivParts(new Date());
+    if (now.dayIndex === target.dayIndex && now.minutes >= overflowHour * 60) {
+      return { ok: true };
     }
 
     const targetWeek = ParticipationService.weekKey(target.dayIndex);
@@ -189,18 +210,22 @@ export class ParticipationService {
     }
 
     if (primeCount >= PRIME_TIME_MAX_PER_WEEK) {
-      throw new ForbiddenException(
-        `У прайм-тайм можна записатися не більше ${PRIME_TIME_MAX_PER_WEEK} разів на тиждень.`,
-      );
+      return {
+        ok: false,
+        reason: `У прайм-тайм можна записатися не більше ${PRIME_TIME_MAX_PER_WEEK} разів на тиждень.`,
+      };
     }
     if (
       event.resourceId === GREEN_RESOURCE_ID &&
       greenCount >= PRIME_TIME_MAX_GREEN_PER_WEEK
     ) {
-      throw new ForbiddenException(
-        'На зелений майданчик у прайм-тайм можна записатися лише раз на тиждень. Оберіть червоний майданчик.',
-      );
+      return {
+        ok: false,
+        reason:
+          'На зелений майданчик у прайм-тайм можна записатися лише раз на тиждень. Оберіть червоний майданчик.',
+      };
     }
+    return { ok: true };
   }
 
   // Member events disappear once the last participant leaves; admin events
@@ -277,34 +302,49 @@ export class ParticipationService {
   }
 
   // Returns the promoted user id (if any) so the caller can notify after commit.
+  // Walks the queue in order and promotes the first user that still fits the
+  // prime-time quota (others are left waiting).
   private async promoteFromWaitlist(
     tx: Tx,
     eventId: string,
-    capacity: number,
+    event: LockedEvent,
   ): Promise<number | null> {
     const count = await tx.eventParticipant.count({ where: { eventId } });
-    if (count >= capacity) {
+    if (count >= event.capacity) {
       return null;
     }
-    const head = await tx.eventWaitlist.findFirst({
+    const queue = await tx.eventWaitlist.findMany({
       where: { eventId },
       orderBy: { createdAt: 'asc' },
     });
-    if (!head) {
-      return null;
-    }
-    await tx.eventParticipant.create({
-      data: {
+    for (const head of queue) {
+      const eligible = await this.checkPrimeQuota(
+        tx,
         eventId,
-        userId: head.userId,
-        addedByUserId: head.userId,
-      },
-    });
-    await tx.eventWaitlist.delete({ where: { id: head.id } });
-    await this.logAction(tx, eventId, Number(head.userId), PARTICIPATION_ACTION.PROMOTED, {
-      userId: Number(head.userId),
-    });
-    return Number(head.userId);
+        Number(head.userId),
+        event,
+      );
+      if (!eligible.ok) {
+        continue;
+      }
+      await tx.eventParticipant.create({
+        data: {
+          eventId,
+          userId: head.userId,
+          addedByUserId: head.userId,
+        },
+      });
+      await tx.eventWaitlist.delete({ where: { id: head.id } });
+      await this.logAction(
+        tx,
+        eventId,
+        Number(head.userId),
+        PARTICIPATION_ACTION.PROMOTED,
+        { userId: Number(head.userId) },
+      );
+      return Number(head.userId);
+    }
+    return null;
   }
 
   async joinSelf(eventId: string, actorId: number): Promise<void> {
@@ -550,11 +590,7 @@ export class ParticipationService {
           guestName: guest ? this.guests.displayName(guest) : null,
         },
       );
-      const promoted = await this.promoteFromWaitlist(
-        tx,
-        eventId,
-        event.capacity,
-      );
+      const promoted = await this.promoteFromWaitlist(tx, eventId, event);
       if (wasAuthor) {
         await this.reassignAuthor(tx, eventId);
       }
@@ -581,11 +617,7 @@ export class ParticipationService {
         await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.LEAVE, {
           userId: actorId,
         });
-        const promoted = await this.promoteFromWaitlist(
-          tx,
-          eventId,
-          event.capacity,
-        );
+        const promoted = await this.promoteFromWaitlist(tx, eventId, event);
         if (wasAuthor) {
           await this.reassignAuthor(tx, eventId);
         }
@@ -628,10 +660,11 @@ export class ParticipationService {
       if (existing) {
         return;
       }
+      // The weekly prime-time cap also gates joining the queue.
+      await this.assertPrimeQuota(tx, eventId, actorId, event);
       const count = await tx.eventParticipant.count({ where: { eventId } });
       if (count < event.capacity) {
         // There is space — join directly instead of waiting.
-        await this.assertPrimeQuota(tx, eventId, actorId, event);
         await tx.eventParticipant.create({
           data: {
             eventId,

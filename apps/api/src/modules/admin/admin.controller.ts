@@ -50,12 +50,14 @@ export class AdminController {
     await this.settings.setBookingOpenHour(dto.bookingOpenHour);
     await this.settings.setPrimeStart(dto.primeStart);
     await this.settings.setPrimeEnd(dto.primeEnd);
+    await this.settings.setPrimeOverflowHour(dto.primeOverflowHour);
 
     const next: AdminSettingsResponse = {
       maxDaysAhead: dto.maxDaysAhead,
       bookingOpenHour: dto.bookingOpenHour,
       primeStart: dto.primeStart,
       primeEnd: dto.primeEnd,
+      primeOverflowHour: dto.primeOverflowHour,
     };
     if (dto.notify) {
       await this.notifyChanges(prev, next);
@@ -92,17 +94,30 @@ export class AdminController {
         `🔥 Прайм-тайм змінено: тепер ${next.primeStart}–${next.primeEnd}.`,
       );
     }
+    if (next.primeOverflowHour !== prev.primeOverflowHour) {
+      const hh = String(next.primeOverflowHour).padStart(2, '0');
+      await this.telegram.broadcastToUsers(
+        `⏳ Додатковий запис у прайм-тайм у день події тепер відкривається о ${hh}:00.`,
+      );
+    }
   }
 
   private async current(): Promise<AdminSettingsResponse> {
-    const [maxDaysAhead, bookingOpenHour, primeStart, primeEnd] =
+    const [maxDaysAhead, bookingOpenHour, primeStart, primeEnd, primeOverflowHour] =
       await Promise.all([
         this.settings.getMaxDaysAhead(),
         this.settings.getBookingOpenHour(),
         this.settings.getPrimeStart(),
         this.settings.getPrimeEnd(),
+        this.settings.getPrimeOverflowHour(),
       ]);
-    return { maxDaysAhead, bookingOpenHour, primeStart, primeEnd };
+    return {
+      maxDaysAhead,
+      bookingOpenHour,
+      primeStart,
+      primeEnd,
+      primeOverflowHour,
+    };
   }
 
   private async assertAdmin(userId: number): Promise<void> {

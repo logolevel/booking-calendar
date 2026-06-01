@@ -19,6 +19,11 @@ export class UpdateSettingsDto {
   @Matches(HH_MM, { message: 'primeEnd must be HH:MM' })
   primeEnd!: string;
 
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  primeOverflowHour!: number;
+
   @IsBoolean()
   notify!: boolean;
 }

@@ -29,7 +29,7 @@ export type EventType = (typeof EVENT_TYPE)[keyof typeof EVENT_TYPE];
 export const RESOURCE_IDS = [1, 2] as const;
 export type ResourceId = (typeof RESOURCE_IDS)[number];
 
-export const MIN_CAPACITY = 1;
+export const MIN_CAPACITY = 2;
 export const MAX_CAPACITY = 8;
 export const DEFAULT_CAPACITY = 6;
 
@@ -46,6 +46,9 @@ export const PRIME_TIME_DEFAULT_START = '18:30';
 export const PRIME_TIME_DEFAULT_END = '20:30';
 export const PRIME_TIME_MAX_PER_WEEK = 2;
 export const PRIME_TIME_MAX_GREEN_PER_WEEK = 1;
+// On a prime-time day, from this local hour (Europe/Kyiv) the weekly cap is
+// lifted so anyone may grab remaining seats or queue for last-minute spots.
+export const PRIME_TIME_OVERFLOW_HOUR = 12;
 
 export interface TelegramUser {
   id: number;
@@ -88,6 +91,8 @@ export interface AdminSettingsResponse {
   // Prime-time window as "HH:MM" strings in Europe/Kyiv.
   primeStart: string;
   primeEnd: string;
+  // Local hour the same-day prime-time overflow window opens.
+  primeOverflowHour: number;
 }
 
 export interface UpdateAdminSettingsRequest {
@@ -95,6 +100,7 @@ export interface UpdateAdminSettingsRequest {
   bookingOpenHour: number;
   primeStart: string;
   primeEnd: string;
+  primeOverflowHour: number;
   // When true, broadcast the changes to every registered user.
   notify: boolean;
 }
