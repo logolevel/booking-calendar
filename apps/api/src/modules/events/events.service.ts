@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import {
   EVENT_TYPE,
   PARTICIPATION_ACTION,
@@ -14,7 +14,10 @@ import {
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { PrimeTimeService } from '../prime-time/prime-time.service';
 import type { CreateEventDto } from './dto/create-event.dto';
+
+type Db = Prisma.TransactionClient;
 
 interface EventRow {
   id: string;
@@ -35,6 +38,7 @@ export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
+    private readonly prime: PrimeTimeService,
   ) {}
 
   async list(from: Date, to: Date): Promise<EventDto[]> {
@@ -74,45 +78,53 @@ export class EventsService {
       await this.assertWithinDateLimit(startsAt);
     }
 
-    await this.assertNoOverlap(dto.resourceId, startsAt, endsAt);
-
     // Only an admin may create an event they do not join (empty event). Such
     // admin events are allowed to stay empty; member events are not.
     const joinSelf = !isGroup && !(isAdmin && dto.skipSelf);
 
-    const event = await this.prisma.event.create({
-      data: {
-        type: dto.type,
-        resourceId: dto.resourceId,
-        title: dto.title ?? null,
-        capacity: dto.capacity,
-        allowEmpty: isAdmin,
-        organizerName: isGroup ? dto.organizerName ?? null : null,
-        organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
-        groupSize: isGroup ? dto.groupSize ?? null : null,
-        startsAt,
-        endsAt,
-        createdBy: BigInt(userId),
-      },
-    });
+    // Create the event and the creator's own participation in one transaction:
+    // the prime-time gate and weekly quota apply to the auto-join exactly as
+    // they do to joining an existing event, so they cannot be bypassed here.
+    const event = await this.prisma.$transaction(async (tx) => {
+      await this.assertNoOverlap(tx, dto.resourceId, startsAt, endsAt);
+      const created = await tx.event.create({
+        data: {
+          type: dto.type,
+          resourceId: dto.resourceId,
+          title: dto.title ?? null,
+          capacity: dto.capacity,
+          allowEmpty: isAdmin,
+          organizerName: isGroup ? dto.organizerName ?? null : null,
+          organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+          groupSize: isGroup ? dto.groupSize ?? null : null,
+          startsAt,
+          endsAt,
+          createdBy: BigInt(userId),
+        },
+      });
 
-    if (joinSelf) {
-      await this.prisma.eventParticipant.create({
-        data: {
-          eventId: event.id,
-          userId: BigInt(userId),
-          addedByUserId: BigInt(userId),
-        },
-      });
-      await this.prisma.eventParticipationLog.create({
-        data: {
-          eventId: event.id,
-          actorUserId: BigInt(userId),
-          targetUserId: BigInt(userId),
-          action: PARTICIPATION_ACTION.JOIN,
-        },
-      });
-    }
+      if (joinSelf) {
+        await this.prime.assertAccess(tx, userId, role, created);
+        await this.prime.assertQuota(tx, userId, created);
+        await tx.eventParticipant.create({
+          data: {
+            eventId: created.id,
+            userId: BigInt(userId),
+            addedByUserId: BigInt(userId),
+          },
+        });
+        await tx.eventParticipationLog.create({
+          data: {
+            eventId: created.id,
+            actorUserId: BigInt(userId),
+            targetUserId: BigInt(userId),
+            action: PARTICIPATION_ACTION.JOIN,
+          },
+        });
+      }
+
+      return created;
+    });
 
     return this.toDto(event, joinSelf ? 1 : 0);
   }
@@ -160,7 +172,7 @@ export class EventsService {
 
     const isGroup = dto.type === EVENT_TYPE.GROUP;
 
-    await this.assertNoOverlap(dto.resourceId, startsAt, endsAt, id);
+    await this.assertNoOverlap(this.prisma, dto.resourceId, startsAt, endsAt, id);
 
     const event = await this.prisma.event.update({
       where: { id },
@@ -207,12 +219,13 @@ export class EventsService {
   // Two events on the same resource (court) may not overlap in time.
   // Overlap: existing.startsAt < newEndsAt AND existing.endsAt > newStartsAt.
   private async assertNoOverlap(
+    db: Db,
     resourceId: number,
     startsAt: Date,
     endsAt: Date,
     excludeId?: string,
   ): Promise<void> {
-    const conflict = await this.prisma.event.findFirst({
+    const conflict = await db.event.findFirst({
       where: {
         resourceId,
         startsAt: { lt: endsAt },

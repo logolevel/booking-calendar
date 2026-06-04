@@ -11,6 +11,8 @@ import { UsersModule } from './modules/users/users.module';
 import { GuestsModule } from './modules/guests/guests.module';
 import { ParticipationModule } from './modules/participation/participation.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { DirectoryModule } from './modules/directory/directory.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { AdminModule } from './modules/admin/admin.module';
     GuestsModule,
     ParticipationModule,
     AdminModule,
+    SubscriptionsModule,
+    DirectoryModule,
   ],
   controllers: [HealthController],
 })

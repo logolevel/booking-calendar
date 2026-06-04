@@ -8,6 +8,8 @@ import { CalendarView } from './features/calendar/ui/CalendarView';
 import { OnboardingForm } from './features/onboarding/ui/OnboardingForm';
 import { SettingsSheet } from './features/admin/ui/SettingsSheet';
 import { AdminsSheet } from './features/admin/ui/AdminsSheet';
+import { SubscriptionsSheet } from './features/subscriptions/ui/SubscriptionsSheet';
+import { UsersSheet } from './features/directory/ui/UsersSheet';
 
 const ROLE_LABELS: Record<Role, string> = {
   [ROLE.ADMIN]: 'Адмін',
@@ -42,6 +44,8 @@ export function App(): JSX.Element {
   const { preview, setPreview } = usePreviewRole();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminsOpen, setAdminsOpen] = useState(false);
+  const [subsOpen, setSubsOpen] = useState(false);
+  const [usersOpen, setUsersOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -89,10 +93,26 @@ export function App(): JSX.Element {
                 <button
                   type="button"
                   className="icon-btn"
+                  aria-label="Користувачі"
+                  onClick={() => setUsersOpen(true)}
+                >
+                  👥
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Абонементи"
+                  onClick={() => setSubsOpen(true)}
+                >
+                  ⭐
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
                   aria-label="Адміністратори"
                   onClick={() => setAdminsOpen(true)}
                 >
-                  🛡️
+                  👑
                 </button>
                 <button
                   type="button"
@@ -116,6 +136,8 @@ export function App(): JSX.Element {
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {adminsOpen && <AdminsSheet onClose={() => setAdminsOpen(false)} />}
+      {subsOpen && <SubscriptionsSheet onClose={() => setSubsOpen(false)} />}
+      {usersOpen && <UsersSheet onClose={() => setUsersOpen(false)} />}
       <main className="app__main">
         {isPreviewing && (
           <div className="preview-bar">

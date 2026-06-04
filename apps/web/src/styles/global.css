@@ -248,6 +248,12 @@ button {
   color: var(--hint);
 }
 
+/* When a hint follows the search block its negative top margin would overlap
+   the input, so give it normal spacing instead. */
+.participants__add + .field__hint {
+  margin-top: 12px;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1122,4 +1128,76 @@ button {
   font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ */
+/* Subscriptions                                                       */
+/* ------------------------------------------------------------------ */
+.subs__selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--secondary-bg);
+}
+
+.subs__heading {
+  margin: 16px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--subtitle);
+}
+
+.subs__meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.subs__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Users directory                                                     */
+/* ------------------------------------------------------------------ */
+.directory__total {
+  margin: 4px 0 12px;
+  font-size: 15px;
+  color: var(--subtitle);
+}
+
+.directory__section {
+  margin-bottom: 16px;
+}
+
+.directory__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--subtitle);
+}
+
+.directory__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--secondary-bg);
+  color: var(--text);
 }

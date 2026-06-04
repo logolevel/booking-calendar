@@ -49,7 +49,7 @@ export class ParticipationController {
     @Headers(PREVIEW_ROLE_HEADER) preview?: string,
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
-    await this.participation.joinSelf(eventId, user.id);
+    await this.participation.joinSelf(eventId, user.id, role);
     this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }
@@ -143,7 +143,7 @@ export class ParticipationController {
     @Headers(PREVIEW_ROLE_HEADER) preview?: string,
   ): Promise<EventParticipantsResponse> {
     const role = await this.resolveRole(user.id, preview);
-    await this.participation.joinWaitlist(eventId, user.id);
+    await this.participation.joinWaitlist(eventId, user.id, role);
     this.gateway.emitEventUpdate(eventId);
     return this.participation.getDetails(eventId, user.id, role);
   }

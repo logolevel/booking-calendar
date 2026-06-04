@@ -22,7 +22,7 @@ export class UpdateSettingsDto {
   @IsInt()
   @Min(0)
   @Max(23)
-  primeOverflowHour!: number;
+  primeMemberOpenHour!: number;
 
   @IsBoolean()
   notify!: boolean;

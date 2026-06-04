@@ -59,6 +59,23 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+// Prime-time perk for a user. Active now when startsAt <= now <= endsAt; an
+// expired row simply stops granting perks. Multiple rows = purchase history.
+model Subscription {
+  id        String   @id @default(uuid())
+  userId    BigInt
+  startsAt  DateTime
+  endsAt    DateTime
+  // Length in whole months (1..12); endsAt = startsAt + months.
+  months    Int
+  // Telegram id of the admin who granted it (manual assignment for now).
+  createdBy BigInt
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, endsAt])
+}
+
 model Event {
   id             String                  @id @default(uuid())
   type           EventType

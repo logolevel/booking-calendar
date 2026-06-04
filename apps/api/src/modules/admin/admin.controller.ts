@@ -120,14 +120,14 @@ export class AdminController {
     await this.settings.setBookingOpenHour(dto.bookingOpenHour);
     await this.settings.setPrimeStart(dto.primeStart);
     await this.settings.setPrimeEnd(dto.primeEnd);
-    await this.settings.setPrimeOverflowHour(dto.primeOverflowHour);
+    await this.settings.setPrimeMemberOpenHour(dto.primeMemberOpenHour);
 
     const next: AdminSettingsResponse = {
       maxDaysAhead: dto.maxDaysAhead,
       bookingOpenHour: dto.bookingOpenHour,
       primeStart: dto.primeStart,
       primeEnd: dto.primeEnd,
-      primeOverflowHour: dto.primeOverflowHour,
+      primeMemberOpenHour: dto.primeMemberOpenHour,
     };
     if (dto.notify) {
       await this.notifyChanges(prev, next);
@@ -164,29 +164,34 @@ export class AdminController {
         `🔥 Прайм-тайм змінено: тепер ${next.primeStart}–${next.primeEnd}.`,
       );
     }
-    if (next.primeOverflowHour !== prev.primeOverflowHour) {
-      const hh = String(next.primeOverflowHour).padStart(2, '0');
+    if (next.primeMemberOpenHour !== prev.primeMemberOpenHour) {
+      const hh = String(next.primeMemberOpenHour).padStart(2, '0');
       await this.telegram.broadcastToUsers(
-        `⏳ Додатковий запис у прайм-тайм за день до події тепер відкривається о ${hh}:00.`,
+        `⏳ Прайм-тайм для учасників тепер відкривається о ${hh}:00 напередодні події (абонемент — без обмежень).`,
       );
     }
   }
 
   private async current(): Promise<AdminSettingsResponse> {
-    const [maxDaysAhead, bookingOpenHour, primeStart, primeEnd, primeOverflowHour] =
-      await Promise.all([
-        this.settings.getMaxDaysAhead(),
-        this.settings.getBookingOpenHour(),
-        this.settings.getPrimeStart(),
-        this.settings.getPrimeEnd(),
-        this.settings.getPrimeOverflowHour(),
-      ]);
+    const [
+      maxDaysAhead,
+      bookingOpenHour,
+      primeStart,
+      primeEnd,
+      primeMemberOpenHour,
+    ] = await Promise.all([
+      this.settings.getMaxDaysAhead(),
+      this.settings.getBookingOpenHour(),
+      this.settings.getPrimeStart(),
+      this.settings.getPrimeEnd(),
+      this.settings.getPrimeMemberOpenHour(),
+    ]);
     return {
       maxDaysAhead,
       bookingOpenHour,
       primeStart,
       primeEnd,
-      primeOverflowHour,
+      primeMemberOpenHour,
     };
   }
 

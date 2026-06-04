@@ -27,7 +27,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
   const [bookingOpenHour, setBookingOpenHour] = useState<number>(10);
   const [primeStart, setPrimeStart] = useState<string>('18:30');
   const [primeEnd, setPrimeEnd] = useState<string>('20:30');
-  const [primeOverflowHour, setPrimeOverflowHour] = useState<number>(12);
+  const [primeMemberOpenHour, setPrimeMemberOpenHour] = useState<number>(12);
   const [notify, setNotify] = useState<boolean>(true);
 
   // Seed the form once the current settings arrive.
@@ -37,7 +37,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
       setBookingOpenHour(data.bookingOpenHour);
       setPrimeStart(data.primeStart);
       setPrimeEnd(data.primeEnd);
-      setPrimeOverflowHour(data.primeOverflowHour);
+      setPrimeMemberOpenHour(data.primeMemberOpenHour);
     }
   }, [data]);
 
@@ -54,7 +54,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
         bookingOpenHour,
         primeStart,
         primeEnd,
-        primeOverflowHour,
+        primeMemberOpenHour,
         notify,
       },
       { onSuccess: onClose },
@@ -119,16 +119,16 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
 
           <p className="field__hint">
             У прайм-тайм: не більше 2 записів на тиждень, із них не більше 1 на
-            зелений майданчик.
+            зелений майданчик (для всіх, завжди).
           </p>
 
           <label className="field">
             <span className="field__label">
-              Додатковий запис за день до події з
+              Прайм для учасників відкривається з
             </span>
             <select
-              value={primeOverflowHour}
-              onChange={(e) => setPrimeOverflowHour(Number(e.target.value))}
+              value={primeMemberOpenHour}
+              onChange={(e) => setPrimeMemberOpenHour(Number(e.target.value))}
             >
               {HOUR_OPTIONS.map((h) => (
                 <option key={h} value={h}>
@@ -139,8 +139,9 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
           </label>
 
           <p className="field__hint">
-            За день до події з цієї години ліміт прайм-тайму знімається — можна
-            зайняти вільні місця або стати в чергу.
+            Звичайні учасники можуть записатися чи стати в чергу на прайм-тайм
+            лише з цієї години напередодні події. Власники абонемента — у повному
+            вікні бронювання.
           </p>
 
           <label className="participants__checkbox field">

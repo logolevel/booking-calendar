@@ -46,9 +46,16 @@ export const PRIME_TIME_DEFAULT_START = '18:30';
 export const PRIME_TIME_DEFAULT_END = '20:30';
 export const PRIME_TIME_MAX_PER_WEEK = 2;
 export const PRIME_TIME_MAX_GREEN_PER_WEEK = 1;
-// From this local hour (Europe/Kyiv) on the day before the event, the weekly
-// cap is lifted so anyone may grab remaining seats or queue for spots.
-export const PRIME_TIME_OVERFLOW_HOUR = 12;
+// Access gate for regular members: prime-time slots open from this local hour
+// (Europe/Kyiv) on the day before the event. Subscribers and admins are not
+// gated (full booking window); the weekly quota above still applies to all.
+export const PRIME_TIME_MEMBER_OPEN_HOUR = 12;
+
+// Subscriptions are granted for a whole number of months (a season = 12).
+export const SUBSCRIPTION_MIN_MONTHS = 1;
+export const SUBSCRIPTION_MAX_MONTHS = 12;
+export const SUBSCRIPTION_SEASON_MONTHS = 12;
+export const SUBSCRIPTION_DEFAULT_MONTHS = 1;
 
 export interface TelegramUser {
   id: number;
@@ -91,8 +98,9 @@ export interface AdminSettingsResponse {
   // Prime-time window as "HH:MM" strings in Europe/Kyiv.
   primeStart: string;
   primeEnd: string;
-  // Local hour the same-day prime-time overflow window opens.
-  primeOverflowHour: number;
+  // Local hour the prime-time access gate opens for regular members
+  // (on the day before the event); subscribers and admins are not gated.
+  primeMemberOpenHour: number;
 }
 
 export interface UpdateAdminSettingsRequest {
@@ -100,7 +108,7 @@ export interface UpdateAdminSettingsRequest {
   bookingOpenHour: number;
   primeStart: string;
   primeEnd: string;
-  primeOverflowHour: number;
+  primeMemberOpenHour: number;
   // When true, broadcast the changes to every registered user.
   notify: boolean;
 }
@@ -256,4 +264,60 @@ export interface CreateGuestRequest {
 
 export interface AddExistingGuestRequest {
   guestId: string;
+}
+
+// A subscription record (purchase history); active when startsAt <= now <= endsAt.
+export interface SubscriptionDto {
+  id: string;
+  userId: number;
+  userName: string;
+  gender: Gender | null;
+  startsAt: string;
+  endsAt: string;
+  months: number;
+  note: string | null;
+  createdBy: number;
+  createdByName: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface SubscriptionListResponse {
+  subscriptions: SubscriptionDto[];
+}
+
+export interface CreateSubscriptionRequest {
+  userId: number;
+  months: number;
+  note?: string;
+}
+
+// Full user directory, grouped into categories for the admin overview.
+export interface DirectoryUserDto {
+  userId: number;
+  name: string;
+  username: string | null;
+  gender: Gender | null;
+  isRoot: boolean;
+  isAdmin: boolean;
+  // Has an active subscription right now.
+  isSubscriber: boolean;
+}
+
+export interface DirectoryGuestDto {
+  id: string;
+  name: string;
+  gender: Gender;
+}
+
+export interface UsersDirectoryResponse {
+  // Grand total across every category (admins + subscribers + members + guests).
+  total: number;
+  admins: DirectoryUserDto[];
+  // Non-admin users with an active subscription.
+  subscribers: DirectoryUserDto[];
+  // Remaining registered users (group members / external).
+  members: DirectoryUserDto[];
+  // Outside guests (not part of the group directory).
+  guests: DirectoryGuestDto[];
 }

@@ -8,6 +8,8 @@ interface Props {
   isUser: boolean;
   // The root super-admin (ADMIN_ID): shown with a plain snowflake glyph.
   isRoot?: boolean;
+  // Owns an active subscription: adds a star, may combine (e.g. 👑⭐).
+  isSubscriber?: boolean;
 }
 
 export function PersonName({
@@ -16,6 +18,7 @@ export function PersonName({
   isAdmin,
   isUser,
   isRoot = false,
+  isSubscriber = false,
 }: Props): JSX.Element {
   const genderClass =
     gender === GENDER.FEMALE
@@ -25,7 +28,8 @@ export function PersonName({
         : '';
   // Plain (monochrome) snowflake for root; crown for other admins.
   // U+FE0E forces text (non-emoji) presentation of the snowflake.
-  const badge = isRoot ? '\u2744\uFE0E' : isAdmin ? '👑' : isUser ? '👤' : '';
+  const roleBadge = isRoot ? '\u2744\uFE0E' : isAdmin ? '👑' : isUser ? '👤' : '';
+  const badge = `${roleBadge}${isSubscriber ? '⭐' : ''}`;
 
   return (
     <span className={`person${genderClass}`}>

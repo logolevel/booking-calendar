@@ -3,7 +3,7 @@ import { AccessModule } from '../access/access.module';
 import { UsersModule } from '../users/users.module';
 import { GuestsModule } from '../guests/guests.module';
 import { TelegramModule } from '../telegram/telegram.module';
-import { SettingsModule } from '../settings/settings.module';
+import { PrimeTimeModule } from '../prime-time/prime-time.module';
 import { EventsGateway } from '../realtime/events.gateway';
 import { ParticipationController } from './participation.controller';
 import { ParticipationService } from './participation.service';
@@ -14,7 +14,7 @@ import { ParticipationService } from './participation.service';
     UsersModule,
     GuestsModule,
     TelegramModule,
-    SettingsModule,
+    PrimeTimeModule,
   ],
   controllers: [ParticipationController],
   providers: [ParticipationService, EventsGateway],
