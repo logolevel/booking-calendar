@@ -46,8 +46,8 @@ export const PRIME_TIME_DEFAULT_START = '18:30';
 export const PRIME_TIME_DEFAULT_END = '20:30';
 export const PRIME_TIME_MAX_PER_WEEK = 2;
 export const PRIME_TIME_MAX_GREEN_PER_WEEK = 1;
-// On a prime-time day, from this local hour (Europe/Kyiv) the weekly cap is
-// lifted so anyone may grab remaining seats or queue for last-minute spots.
+// From this local hour (Europe/Kyiv) on the day before the event, the weekly
+// cap is lifted so anyone may grab remaining seats or queue for spots.
 export const PRIME_TIME_OVERFLOW_HOUR = 12;
 
 export interface TelegramUser {

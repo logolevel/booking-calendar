@@ -124,7 +124,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
 
           <label className="field">
             <span className="field__label">
-              Додатковий запис у день події з
+              Додатковий запис за день до події з
             </span>
             <select
               value={primeOverflowHour}
@@ -139,7 +139,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
           </label>
 
           <p className="field__hint">
-            У день події з цієї години ліміт прайм-тайму знімається — можна
+            За день до події з цієї години ліміт прайм-тайму знімається — можна
             зайняти вільні місця або стати в чергу.
           </p>
 

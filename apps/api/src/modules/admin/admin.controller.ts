@@ -97,7 +97,7 @@ export class AdminController {
     if (next.primeOverflowHour !== prev.primeOverflowHour) {
       const hh = String(next.primeOverflowHour).padStart(2, '0');
       await this.telegram.broadcastToUsers(
-        `⏳ Додатковий запис у прайм-тайм у день події тепер відкривається о ${hh}:00.`,
+        `⏳ Додатковий запис у прайм-тайм за день до події тепер відкривається о ${hh}:00.`,
       );
     }
   }

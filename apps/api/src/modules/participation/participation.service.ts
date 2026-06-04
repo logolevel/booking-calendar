@@ -178,9 +178,14 @@ export class ParticipationService {
       return { ok: true };
     }
 
-    // Same-day overflow window: the weekly cap no longer applies.
+    // Overflow window: from the overflow hour on the day before the event the
+    // weekly cap no longer applies (and stays lifted through the event day).
     const now = ParticipationService.kyivParts(new Date());
-    if (now.dayIndex === target.dayIndex && now.minutes >= overflowHour * 60) {
+    const dayBefore = target.dayIndex - 1;
+    if (
+      now.dayIndex > dayBefore ||
+      (now.dayIndex === dayBefore && now.minutes >= overflowHour * 60)
+    ) {
       return { ok: true };
     }
 
