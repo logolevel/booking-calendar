@@ -2,19 +2,27 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
+  Param,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import type { AdminSettingsResponse } from '@tg-calendar/shared-types';
+import type {
+  AdminListResponse,
+  AdminSettingsResponse,
+} from '@tg-calendar/shared-types';
 import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
 import { AccessService } from '../access/access.service';
 import { SettingsService } from '../settings/settings.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { UsersService } from '../users/users.service';
+import { GrantAdminDto } from './dto/grant-admin.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 @Controller('api/admin')
@@ -24,7 +32,69 @@ export class AdminController {
     private readonly access: AccessService,
     private readonly settings: SettingsService,
     private readonly telegram: TelegramService,
+    private readonly users: UsersService,
   ) {}
+
+  @Get('admins')
+  async listAdmins(
+    @CurrentUser() user: VerifiedTelegramUser,
+  ): Promise<AdminListResponse> {
+    await this.assertAdmin(user.id);
+    return this.adminList(user.id);
+  }
+
+  @Post('admins')
+  async grantAdmin(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Body() dto: GrantAdminDto,
+  ): Promise<AdminListResponse> {
+    await this.assertAdmin(user.id);
+    await this.access.grantAdmin(dto.userId);
+    if (dto.userId !== user.id) {
+      await this.telegram.notifyUser(
+        dto.userId,
+        '👑 Вам надано права адміністратора.',
+      );
+    }
+    return this.adminList(user.id);
+  }
+
+  @Delete('admins/:userId')
+  async revokeAdmin(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('userId') userId: string,
+  ): Promise<AdminListResponse> {
+    await this.assertAdmin(user.id);
+    const targetId = Number(userId);
+    if (!Number.isFinite(targetId)) {
+      throw new BadRequestException('Invalid user id');
+    }
+    if (targetId === user.id) {
+      throw new ForbiddenException('You cannot revoke your own admin rights');
+    }
+    // revokeAdmin already rejects the root admin.
+    await this.access.revokeAdmin(targetId);
+    await this.telegram.notifyUser(
+      targetId,
+      'ℹ️ Ваші права адміністратора скасовано.',
+    );
+    return this.adminList(user.id);
+  }
+
+  private async adminList(viewerId: number): Promise<AdminListResponse> {
+    const ids = await this.access.listAdminIds();
+    const rows = await this.users.listByIds(ids);
+    return {
+      admins: rows.map((r) => ({
+        userId: r.userId,
+        name: r.name,
+        username: r.username,
+        gender: r.gender,
+        isRoot: this.access.isRoot(r.userId),
+        isSelf: r.userId === viewerId,
+      })),
+    };
+  }
 
   @Get('settings')
   async get(

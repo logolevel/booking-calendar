@@ -6,16 +6,26 @@ interface Props {
   isAdmin: boolean;
   // A registered app user (not an outside guest).
   isUser: boolean;
+  // The root super-admin (ADMIN_ID): shown with a plain snowflake glyph.
+  isRoot?: boolean;
 }
 
-export function PersonName({ name, gender, isAdmin, isUser }: Props): JSX.Element {
+export function PersonName({
+  name,
+  gender,
+  isAdmin,
+  isUser,
+  isRoot = false,
+}: Props): JSX.Element {
   const genderClass =
     gender === GENDER.FEMALE
       ? ' person--female'
       : gender === GENDER.MALE
         ? ' person--male'
         : '';
-  const badge = isAdmin ? '👑' : isUser ? '👤' : '';
+  // Plain (monochrome) snowflake for root; crown for other admins.
+  // U+FE0E forces text (non-emoji) presentation of the snowflake.
+  const badge = isRoot ? '\u2744\uFE0E' : isAdmin ? '👑' : isUser ? '👤' : '';
 
   return (
     <span className={`person${genderClass}`}>

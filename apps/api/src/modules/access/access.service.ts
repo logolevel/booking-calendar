@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -27,10 +32,24 @@ export class AccessService {
     private readonly config: ConfigService,
   ) {}
 
+  // The immutable super-admin from the environment (cannot be revoked).
+  isRoot(userId: number): boolean {
+    const adminId = Number(this.config.get<string>('ADMIN_ID'));
+    return Number.isFinite(adminId) && userId === adminId;
+  }
+
   // Effective role; null means no access.
   async resolveRole(userId: number): Promise<Role | null> {
-    const adminId = Number(this.config.get<string>('ADMIN_ID'));
-    if (Number.isFinite(adminId) && userId === adminId) {
+    if (this.isRoot(userId)) {
+      return Role.admin;
+    }
+
+    // DB-assigned admins stay admin even outside the group.
+    const user = await this.prisma.user.findUnique({
+      where: { id: BigInt(userId) },
+      select: { isAdmin: true },
+    });
+    if (user?.isAdmin) {
       return Role.admin;
     }
 
@@ -100,6 +119,47 @@ export class AccessService {
       data: { accessRevoked: true },
     });
     this.membershipCache.delete(telegramId);
+  }
+
+  // Telegram ids of every admin: root (env) plus everyone flagged in the DB.
+  async listAdminIds(): Promise<number[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { isAdmin: true },
+      select: { id: true },
+    });
+    const ids = rows.map((r) => Number(r.id));
+    const adminId = Number(this.config.get<string>('ADMIN_ID'));
+    if (Number.isFinite(adminId) && !ids.includes(adminId)) {
+      ids.unshift(adminId);
+    }
+    return ids;
+  }
+
+  // Promote an existing user (must have interacted with the bot/Mini App).
+  async grantAdmin(targetId: number): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: BigInt(targetId) },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    await this.prisma.user.update({
+      where: { id: BigInt(targetId) },
+      data: { isAdmin: true },
+    });
+    this.membershipCache.delete(targetId);
+  }
+
+  // Demote an admin. The root admin (env) can never be revoked.
+  async revokeAdmin(targetId: number): Promise<void> {
+    if (this.isRoot(targetId)) {
+      throw new ForbiddenException('Cannot revoke the root admin');
+    }
+    await this.prisma.user.updateMany({
+      where: { id: BigInt(targetId) },
+      data: { isAdmin: false },
+    });
+    this.membershipCache.delete(targetId);
   }
 
   private async isGroupMember(userId: number): Promise<boolean> {

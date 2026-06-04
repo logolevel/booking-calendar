@@ -105,6 +105,26 @@ export interface UpdateAdminSettingsRequest {
   notify: boolean;
 }
 
+// An admin entry shown in the admin management list.
+export interface AdminUserDto {
+  userId: number;
+  name: string;
+  username: string | null;
+  gender: Gender | null;
+  // The immutable super-admin from ADMIN_ID (cannot be revoked).
+  isRoot: boolean;
+  // True when this row is the current viewer.
+  isSelf: boolean;
+}
+
+export interface AdminListResponse {
+  admins: AdminUserDto[];
+}
+
+export interface GrantAdminRequest {
+  userId: number;
+}
+
 // Header used by an admin to preview the app as another role.
 export const PREVIEW_ROLE_HEADER = 'x-preview-role';
 
@@ -160,6 +180,8 @@ export interface ParticipantDto {
   name: string;
   gender: Gender | null;
   isAdmin: boolean;
+  // The root super-admin (ADMIN_ID); shown with a snowflake instead of a crown.
+  isRoot: boolean;
   isGuest: boolean;
   addedByUserId: number;
   addedByName: string;
@@ -175,6 +197,7 @@ export interface WaitlistEntryDto {
   name: string;
   gender: Gender | null;
   isAdmin: boolean;
+  isRoot: boolean;
   isSelf: boolean;
   createdAt: string;
 }

@@ -7,6 +7,7 @@ import { ApiError } from './shared/api/client';
 import { CalendarView } from './features/calendar/ui/CalendarView';
 import { OnboardingForm } from './features/onboarding/ui/OnboardingForm';
 import { SettingsSheet } from './features/admin/ui/SettingsSheet';
+import { AdminsSheet } from './features/admin/ui/AdminsSheet';
 
 const ROLE_LABELS: Record<Role, string> = {
   [ROLE.ADMIN]: 'Адмін',
@@ -40,6 +41,7 @@ export function App(): JSX.Element {
   const { data: me, isLoading, error } = useMe();
   const { preview, setPreview } = usePreviewRole();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adminsOpen, setAdminsOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -83,14 +85,24 @@ export function App(): JSX.Element {
         {me.isAdmin ? (
           <div className="app__header-actions">
             {me.role === ROLE.ADMIN && (
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Налаштування"
-                onClick={() => setSettingsOpen(true)}
-              >
-                ⚙️
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Адміністратори"
+                  onClick={() => setAdminsOpen(true)}
+                >
+                  🛡️
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Налаштування"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  ⚙️
+                </button>
+              </>
             )}
             <RoleSwitch
               value={preview ?? ROLE.ADMIN}
@@ -103,6 +115,7 @@ export function App(): JSX.Element {
       </header>
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
+      {adminsOpen && <AdminsSheet onClose={() => setAdminsOpen(false)} />}
       <main className="app__main">
         {isPreviewing && (
           <div className="preview-bar">

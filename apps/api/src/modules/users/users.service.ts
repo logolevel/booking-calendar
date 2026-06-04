@@ -49,6 +49,33 @@ export class UsersService {
     }));
   }
 
+  // Resolve display data for the given ids, preserving order. Ids missing from
+  // the table (e.g. a root admin who never opened the app) get a placeholder.
+  async listByIds(
+    ids: number[],
+  ): Promise<
+    { userId: number; name: string; username: string | null; gender: Gender | null }[]
+  > {
+    if (ids.length === 0) {
+      return [];
+    }
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids.map((id) => BigInt(id)) } },
+    });
+    const byId = new Map(users.map((u) => [Number(u.id), u]));
+    return ids.map((id) => {
+      const u = byId.get(id);
+      return u
+        ? {
+            userId: id,
+            name: this.displayName(u),
+            username: u.username ?? null,
+            gender: u.gender,
+          }
+        : { userId: id, name: 'Користувач', username: null, gender: null };
+    });
+  }
+
   async getProfileMap(ids: number[]): Promise<Map<number, UserProfile>> {
     const unique = [...new Set(ids)];
     if (unique.length === 0) {

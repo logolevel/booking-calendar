@@ -14,6 +14,7 @@ import {
   type ParticipationAction,
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AccessService } from '../access/access.service';
 import { UsersService } from '../users/users.service';
 import { GuestsService } from '../guests/guests.service';
 import { TelegramService } from '../telegram/telegram.service';
@@ -37,6 +38,7 @@ const GREEN_RESOURCE_ID = 1;
 export class ParticipationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly access: AccessService,
     private readonly users: UsersService,
     private readonly guests: GuestsService,
     private readonly telegram: TelegramService,
@@ -801,6 +803,7 @@ export class ParticipationService {
               : guest?.name ?? 'Гість',
           gender: profile?.gender ?? guest?.gender ?? null,
           isAdmin: profile?.isAdmin ?? false,
+          isRoot: p.userId != null && this.access.isRoot(Number(p.userId)),
           isGuest: p.guestId != null,
           addedByUserId: Number(p.addedByUserId),
           addedByName: nameOf(Number(p.addedByUserId)),
@@ -817,6 +820,7 @@ export class ParticipationService {
           name: nameOf(Number(w.userId)),
           gender: profile?.gender ?? null,
           isAdmin: profile?.isAdmin ?? false,
+          isRoot: this.access.isRoot(Number(w.userId)),
           isSelf: w.userId === actor,
           createdAt: w.createdAt.toISOString(),
         };

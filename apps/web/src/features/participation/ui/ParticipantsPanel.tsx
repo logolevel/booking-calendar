@@ -257,6 +257,7 @@ export function ParticipantsPanel({
                     gender={p.gender}
                     isAdmin={p.isAdmin}
                     isUser={p.userId != null}
+                    isRoot={p.isRoot}
                   />
                   {p.isSelf && <span className="participants__you"> (ви)</span>}
                   {p.isGuest && (
@@ -352,6 +353,7 @@ export function ParticipantsPanel({
                         gender={w.gender}
                         isAdmin={w.isAdmin}
                         isUser
+                        isRoot={w.isRoot}
                       />
                       {w.isSelf && <span className="participants__you"> (ви)</span>}
                     </span>

@@ -36,6 +36,8 @@ model User {
   gender      Gender?
   onboardedAt DateTime?
   role        Role      @default(member)
+  // Admins assigned from the Mini App by other admins (root stays in ADMIN_ID).
+  isAdmin     Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   events      Event[]
