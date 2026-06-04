@@ -27,6 +27,8 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
   const [bookingOpenHour, setBookingOpenHour] = useState<number>(10);
   const [primeStart, setPrimeStart] = useState<string>('18:30');
   const [primeEnd, setPrimeEnd] = useState<string>('20:30');
+  const [subPrimeStart, setSubPrimeStart] = useState<string>('16:30');
+  const [subPrimeEnd, setSubPrimeEnd] = useState<string>('20:30');
   const [primeMemberOpenHour, setPrimeMemberOpenHour] = useState<number>(12);
   const [notify, setNotify] = useState<boolean>(true);
 
@@ -37,15 +39,21 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
       setBookingOpenHour(data.bookingOpenHour);
       setPrimeStart(data.primeStart);
       setPrimeEnd(data.primeEnd);
+      setSubPrimeStart(data.subPrimeStart);
+      setSubPrimeEnd(data.subPrimeEnd);
       setPrimeMemberOpenHour(data.primeMemberOpenHour);
     }
   }, [data]);
 
   const primeInvalid = primeStart >= primeEnd;
+  const subPrimeInvalid = subPrimeStart >= subPrimeEnd;
+  // The quota window must sit inside the gated subscription-prime window.
+  const rangeInvalid = primeStart < subPrimeStart || primeEnd > subPrimeEnd;
+  const formInvalid = primeInvalid || subPrimeInvalid || rangeInvalid;
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
-    if (primeInvalid) {
+    if (formInvalid) {
       return;
     }
     update.mutate(
@@ -54,6 +62,8 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
         bookingOpenHour,
         primeStart,
         primeEnd,
+        subPrimeStart,
+        subPrimeEnd,
         primeMemberOpenHour,
         notify,
       },
@@ -122,9 +132,34 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
             зелений майданчик (для всіх, завжди).
           </p>
 
+          <div className="field">
+            <span className="field__label">Прайм-абонемент тайм</span>
+            <div className="settings__range">
+              <input
+                type="time"
+                step={1800}
+                value={subPrimeStart}
+                onChange={(e) => setSubPrimeStart(e.target.value)}
+              />
+              <span className="settings__range-dash">–</span>
+              <input
+                type="time"
+                step={1800}
+                value={subPrimeEnd}
+                onChange={(e) => setSubPrimeEnd(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <p className="field__hint">
+            Жовте вікно в календарі. Має містити прайм-тайм. Доступ у цьому вікні
+            гейтиться: власники абонемента — одразу, звичайні учасники — лише з
+            години нижче напередодні події.
+          </p>
+
           <label className="field">
             <span className="field__label">
-              Прайм для учасників відкривається з
+              Прайм-абонемент для учасників відкривається з
             </span>
             <select
               value={primeMemberOpenHour}
@@ -139,9 +174,9 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
           </label>
 
           <p className="field__hint">
-            Звичайні учасники можуть записатися чи стати в чергу на прайм-тайм
-            лише з цієї години напередодні події. Власники абонемента — у повному
-            вікні бронювання.
+            Звичайні учасники можуть записатися чи стати в чергу у прайм-абонемент
+            вікні лише з цієї години напередодні події. Власники абонемента — у
+            повному вікні бронювання.
           </p>
 
           <label className="participants__checkbox field">
@@ -158,6 +193,16 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
               Початок прайм-тайму має бути раніше за кінець.
             </p>
           )}
+          {subPrimeInvalid && (
+            <p className="form__error">
+              Початок прайм-абонемент тайму має бути раніше за кінець.
+            </p>
+          )}
+          {!primeInvalid && !subPrimeInvalid && rangeInvalid && (
+            <p className="form__error">
+              Прайм-тайм має бути в межах прайм-абонемент тайму.
+            </p>
+          )}
           {update.isError && (
             <p className="form__error">Не вдалося зберегти налаштування.</p>
           )}
@@ -169,7 +214,7 @@ export function SettingsSheet({ onClose }: Props): JSX.Element {
             <Button
               type="submit"
               block
-              disabled={update.isPending || primeInvalid}
+              disabled={update.isPending || formInvalid}
             >
               Зберегти
             </Button>

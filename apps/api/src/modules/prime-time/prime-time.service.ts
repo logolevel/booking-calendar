@@ -87,7 +87,18 @@ export class PrimeTimeService {
     };
   }
 
-  // Whether the event's own window overlaps prime time.
+  private async subPrimeWindow(): Promise<{ start: number; end: number }> {
+    const [startStr, endStr] = await Promise.all([
+      this.settings.getSubPrimeStart(),
+      this.settings.getSubPrimeEnd(),
+    ]);
+    return {
+      start: PrimeTimeService.toMinutes(startStr),
+      end: PrimeTimeService.toMinutes(endStr),
+    };
+  }
+
+  // Whether the event's own window overlaps the prime (weekly-quota) window.
   async eventInPrime(event: PrimeEvent): Promise<boolean> {
     const { start, end } = await this.primeWindow();
     const s = PrimeTimeService.kyivParts(event.startsAt);
@@ -95,7 +106,16 @@ export class PrimeTimeService {
     return PrimeTimeService.overlaps(s.minutes, e.minutes, start, end);
   }
 
-  // Time gate: a regular member may take a prime-time slot only from
+  // Whether the event's own window overlaps the subscription-prime (access
+  // gate) window.
+  async eventInSubPrime(event: PrimeEvent): Promise<boolean> {
+    const { start, end } = await this.subPrimeWindow();
+    const s = PrimeTimeService.kyivParts(event.startsAt);
+    const e = PrimeTimeService.kyivParts(event.endsAt);
+    return PrimeTimeService.overlaps(s.minutes, e.minutes, start, end);
+  }
+
+  // Time gate: a regular member may take a subscription-prime slot only from
   // primeMemberOpenHour on the day before the event. The acting admin, the
   // booked admin/root and active subscribers bypass it. The weekly quota is
   // separate and applies to everyone.
@@ -105,7 +125,7 @@ export class PrimeTimeService {
     actorRole: Role,
     event: PrimeEvent,
   ): Promise<PrimeCheck> {
-    if (!(await this.eventInPrime(event))) {
+    if (!(await this.eventInSubPrime(event))) {
       return { ok: true };
     }
     if (actorRole === Role.admin || this.access.isRoot(bookedUserId)) {

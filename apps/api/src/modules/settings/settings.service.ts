@@ -5,6 +5,8 @@ import {
   PRIME_TIME_DEFAULT_END,
   PRIME_TIME_DEFAULT_START,
   PRIME_TIME_MEMBER_OPEN_HOUR,
+  SUB_PRIME_TIME_DEFAULT_END,
+  SUB_PRIME_TIME_DEFAULT_START,
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -12,6 +14,8 @@ const MAX_DAYS_AHEAD_KEY = 'maxDaysAhead';
 const BOOKING_OPEN_HOUR_KEY = 'bookingOpenHour';
 const PRIME_START_KEY = 'primeStart';
 const PRIME_END_KEY = 'primeEnd';
+const SUB_PRIME_START_KEY = 'subPrimeStart';
+const SUB_PRIME_END_KEY = 'subPrimeEnd';
 const PRIME_MEMBER_OPEN_HOUR_KEY = 'primeMemberOpenHour';
 
 const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -78,6 +82,22 @@ export class SettingsService {
 
   async setPrimeEnd(value: string): Promise<void> {
     await this.setTime(PRIME_END_KEY, value);
+  }
+
+  async getSubPrimeStart(): Promise<string> {
+    return this.getTime(SUB_PRIME_START_KEY, SUB_PRIME_TIME_DEFAULT_START);
+  }
+
+  async getSubPrimeEnd(): Promise<string> {
+    return this.getTime(SUB_PRIME_END_KEY, SUB_PRIME_TIME_DEFAULT_END);
+  }
+
+  async setSubPrimeStart(value: string): Promise<void> {
+    await this.setTime(SUB_PRIME_START_KEY, value);
+  }
+
+  async setSubPrimeEnd(value: string): Promise<void> {
+    await this.setTime(SUB_PRIME_END_KEY, value);
   }
 
   async getPrimeMemberOpenHour(): Promise<number> {

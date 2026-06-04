@@ -14,6 +14,7 @@ import { CurrentUser } from '../../auth/current-user.decorator';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
 import { AccessService } from '../access/access.service';
 import { SettingsService } from '../settings/settings.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { MeService } from './me.service';
 import { OnboardingDto } from './dto/onboarding.dto';
 
@@ -23,6 +24,7 @@ export class MeController {
   constructor(
     private readonly access: AccessService,
     private readonly settings: SettingsService,
+    private readonly subscriptions: SubscriptionsService,
     private readonly me: MeService,
   ) {}
 
@@ -65,9 +67,20 @@ export class MeController {
     role: Role,
     isAdmin: boolean,
   ): Promise<MeResponse> {
-    const [maxDaysAhead, bookingOpenHour] = await Promise.all([
+    const [
+      maxDaysAhead,
+      bookingOpenHour,
+      subPrimeStart,
+      subPrimeEnd,
+      primeMemberOpenHour,
+      isSubscriber,
+    ] = await Promise.all([
       this.settings.getMaxDaysAhead(),
       this.settings.getBookingOpenHour(),
+      this.settings.getSubPrimeStart(),
+      this.settings.getSubPrimeEnd(),
+      this.settings.getPrimeMemberOpenHour(),
+      this.subscriptions.isActive(user.id),
     ]);
     return {
       id: user.id,
@@ -80,6 +93,10 @@ export class MeController {
       profileComplete: Boolean(stored?.onboardedAt && stored.gender),
       maxDaysAhead,
       bookingOpenHour,
+      subPrimeStart,
+      subPrimeEnd,
+      primeMemberOpenHour,
+      isSubscriber,
     };
   }
 }

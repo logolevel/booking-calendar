@@ -19,6 +19,12 @@ export class UpdateSettingsDto {
   @Matches(HH_MM, { message: 'primeEnd must be HH:MM' })
   primeEnd!: string;
 
+  @Matches(HH_MM, { message: 'subPrimeStart must be HH:MM' })
+  subPrimeStart!: string;
+
+  @Matches(HH_MM, { message: 'subPrimeEnd must be HH:MM' })
+  subPrimeEnd!: string;
+
   @IsInt()
   @Min(0)
   @Max(23)

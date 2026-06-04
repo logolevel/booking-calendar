@@ -39,6 +39,10 @@ import {
   clampEnd,
   clampStart,
   snap30,
+  isPrimeSlot,
+  overlapsPrime,
+  memberGateOpen,
+  parseHhMm,
   DEFAULT_DURATION_MIN,
   STEP_MIN,
 } from '../model/slotTime';
@@ -139,12 +143,20 @@ interface Props {
   role: Role;
   maxDaysAhead: number;
   bookingOpenHour: number;
+  subPrimeStart: string;
+  subPrimeEnd: string;
+  primeMemberOpenHour: number;
+  isSubscriber: boolean;
 }
 
 export function CalendarView({
   role,
   maxDaysAhead,
   bookingOpenHour,
+  subPrimeStart,
+  subPrimeEnd,
+  primeMemberOpenHour,
+  isSubscriber,
 }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
   const [view, setView] = useState<View>(getDefaultView);
@@ -158,6 +170,34 @@ export function CalendarView({
 
   const canCreate = role === ROLE.ADMIN || role === ROLE.MEMBER;
   const isAdmin = role === ROLE.ADMIN;
+
+  // Subscription-prime window (the yellow band) in minutes-of-day.
+  const subPrime = useMemo(() => {
+    const start = parseHhMm(subPrimeStart);
+    const end = parseHhMm(subPrimeEnd);
+    return start != null && end != null && start < end ? { start, end } : null;
+  }, [subPrimeStart, subPrimeEnd]);
+
+  // Subtle pastel-yellow highlight on every subscription-prime slot, all roles.
+  const slotPropGetter = (slot: Date): { className?: string } => {
+    if (subPrime && isPrimeSlot(slot, subPrime.start, subPrime.end)) {
+      return { className: 'rbc-prime-slot' };
+    }
+    return {};
+  };
+
+  // Whether a regular member is currently barred from booking a slot in the
+  // subscription-prime window: admins and active subscribers always pass; other
+  // members must wait for the access gate to open the day before the event.
+  const subPrimeBlocked = (start: Date, end: Date): boolean => {
+    if (isAdmin || isSubscriber || !subPrime) {
+      return false;
+    }
+    if (!overlapsPrime(start, end, subPrime.start, subPrime.end)) {
+      return false;
+    }
+    return !memberGateOpen(start, primeMemberOpenHour);
+  };
 
   // Regular users can only book within [today, today + maxDaysAhead]. The
   // newest day opens at BOOKING_OPEN_HOUR, so before that it stays dimmed.
@@ -208,7 +248,13 @@ export function CalendarView({
     } else {
       end = addStep(start, DEFAULT_DURATION_STEPS);
     }
-    setDraft({ start, end: clampEnd(start, end) });
+    end = clampEnd(start, end);
+    // Ignore taps a regular member cannot book yet, so they don't fill in a
+    // draft only to be rejected by the backend access gate.
+    if (subPrimeBlocked(start, end)) {
+      return;
+    }
+    setDraft({ start, end });
     setActiveEvent(null);
     setMode('slot');
     setFormOpen(true);
@@ -289,6 +335,7 @@ export function CalendarView({
         formats={calendarFormats}
         components={calendarComponents}
         dayPropGetter={dayPropGetter}
+        slotPropGetter={slotPropGetter}
         min={new Date(1970, 0, 1, 8, 0, 0)}
         max={new Date(1970, 0, 1, 23, 0, 0)}
         popup
@@ -334,6 +381,10 @@ export function CalendarView({
               isAdmin={isAdmin}
               initialStart={draft ? draft.start.toISOString() : undefined}
               initialEnd={draft ? draft.end.toISOString() : undefined}
+              subPrimeStart={subPrimeStart}
+              subPrimeEnd={subPrimeEnd}
+              primeMemberOpenHour={primeMemberOpenHour}
+              isSubscriber={isSubscriber}
               onClose={closeForm}
             />
           )}

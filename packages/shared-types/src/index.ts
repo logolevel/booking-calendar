@@ -40,15 +40,23 @@ export const DEFAULT_MAX_DAYS_AHEAD = 7;
 // (Europe/Kyiv) instead of midnight, to avoid a midnight sign-up rush.
 export const BOOKING_OPEN_HOUR = 10;
 
-// Prime time is the busiest window (Europe/Kyiv). Each user may book at most
-// two prime-time slots per week, with at most one of them on the green court.
+// Prime time is the busiest window (Europe/Kyiv). The weekly quota applies
+// here: each user may book at most two prime-time slots per week, with at most
+// one of them on the green court.
 export const PRIME_TIME_DEFAULT_START = '18:30';
 export const PRIME_TIME_DEFAULT_END = '20:30';
 export const PRIME_TIME_MAX_PER_WEEK = 2;
 export const PRIME_TIME_MAX_GREEN_PER_WEEK = 1;
-// Access gate for regular members: prime-time slots open from this local hour
-// (Europe/Kyiv) on the day before the event. Subscribers and admins are not
-// gated (full booking window); the weekly quota above still applies to all.
+
+// Subscription-prime is the wider window (Europe/Kyiv) shown in yellow on the
+// calendar. The member access gate applies here: subscribers (and admins) may
+// book it across the whole booking window, while regular members can only book
+// from PRIME_TIME_MEMBER_OPEN_HOUR on the day before the event.
+export const SUB_PRIME_TIME_DEFAULT_START = '16:30';
+export const SUB_PRIME_TIME_DEFAULT_END = '20:30';
+// Access gate for regular members: subscription-prime slots open from this
+// local hour (Europe/Kyiv) on the day before the event. Subscribers and admins
+// are not gated (full booking window); the weekly quota still applies to all.
 export const PRIME_TIME_MEMBER_OPEN_HOUR = 12;
 
 // Subscriptions are granted for a whole number of months (a season = 12).
@@ -84,6 +92,16 @@ export interface MeResponse {
   maxDaysAhead: number;
   // Local hour (Europe/Kyiv) when the furthest bookable day opens.
   bookingOpenHour: number;
+  // Subscription-prime window as "HH:MM" (Europe/Kyiv): the yellow window the
+  // calendar highlights and gates slot creation in for regular members.
+  subPrimeStart: string;
+  subPrimeEnd: string;
+  // Local hour the subscription-prime access gate opens for regular members
+  // (on the day before the event); subscribers and admins are not gated.
+  primeMemberOpenHour: number;
+  // Whether this user currently holds an active subscription (bypasses the
+  // member access gate on the subscription-prime window).
+  isSubscriber: boolean;
 }
 
 export interface OnboardingRequest {
@@ -95,10 +113,14 @@ export interface OnboardingRequest {
 export interface AdminSettingsResponse {
   maxDaysAhead: number;
   bookingOpenHour: number;
-  // Prime-time window as "HH:MM" strings in Europe/Kyiv.
+  // Prime-time window as "HH:MM" (Europe/Kyiv): the weekly-quota window.
   primeStart: string;
   primeEnd: string;
-  // Local hour the prime-time access gate opens for regular members
+  // Subscription-prime window as "HH:MM" (Europe/Kyiv): the wider, yellow
+  // window the member access gate applies to.
+  subPrimeStart: string;
+  subPrimeEnd: string;
+  // Local hour the subscription-prime access gate opens for regular members
   // (on the day before the event); subscribers and admins are not gated.
   primeMemberOpenHour: number;
 }
@@ -108,6 +130,8 @@ export interface UpdateAdminSettingsRequest {
   bookingOpenHour: number;
   primeStart: string;
   primeEnd: string;
+  subPrimeStart: string;
+  subPrimeEnd: string;
   primeMemberOpenHour: number;
   // When true, broadcast the changes to every registered user.
   notify: boolean;

@@ -48,3 +48,48 @@ export function dayStartOf(date: Date): Date {
 export function dayEndOf(date: Date): Date {
   return withTime(date, DAY_END_HOUR, 0);
 }
+
+// Parse an "HH:MM" string into minutes-of-day; null when malformed.
+export function parseHhMm(hhmm: string): number | null {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
+  return h * 60 + m;
+}
+
+function minutesOfDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+// True when a 30-minute slot starting at `date` sits inside the prime window.
+export function isPrimeSlot(
+  date: Date,
+  primeStartMin: number,
+  primeEndMin: number,
+): boolean {
+  const min = minutesOfDay(date);
+  return min >= primeStartMin && min < primeEndMin;
+}
+
+// True when the [start, end) range overlaps the prime window (same day).
+export function overlapsPrime(
+  start: Date,
+  end: Date,
+  primeStartMin: number,
+  primeEndMin: number,
+): boolean {
+  return minutesOfDay(start) < primeEndMin && minutesOfDay(end) > primeStartMin;
+}
+
+// Whether the regular-member access gate is already open for an event starting
+// at `eventStart`: it opens at `memberOpenHour` on the day before the event.
+// Subscribers and admins bypass this and are handled by the caller.
+export function memberGateOpen(
+  eventStart: Date,
+  memberOpenHour: number,
+  now: Date = new Date(),
+): boolean {
+  const open = new Date(eventStart);
+  open.setDate(open.getDate() - 1);
+  open.setHours(memberOpenHour, 0, 0, 0);
+  return now.getTime() >= open.getTime();
+}

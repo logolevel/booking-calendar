@@ -11,6 +11,7 @@ import {
   type ResourceId,
 } from '@tg-calendar/shared-types';
 import { useCreateEvent, useUpdateEvent } from '../useEvents';
+import { memberGateOpen, overlapsPrime, parseHhMm } from '../model/slotTime';
 import { eventTypeLabel, resourceLabel } from '../eventLabels';
 import { ApiError } from '../../../shared/api/client';
 import { Button } from '../../../shared/ui/Button';
@@ -53,6 +54,12 @@ interface Props {
   // ISO strings used to prefill a new event created from a calendar slot.
   initialStart?: string;
   initialEnd?: string;
+  // Subscription-prime window ("HH:MM") gated for regular members, plus the
+  // gate-open hour and whether the viewer holds an active subscription.
+  subPrimeStart?: string;
+  subPrimeEnd?: string;
+  primeMemberOpenHour?: number;
+  isSubscriber?: boolean;
   onClose: () => void;
 }
 
@@ -61,6 +68,10 @@ export function EventForm({
   isAdmin,
   initialStart,
   initialEnd,
+  subPrimeStart,
+  subPrimeEnd,
+  primeMemberOpenHour,
+  isSubscriber,
   onClose,
 }: Props): JSX.Element {
   const isEdit = Boolean(event);
@@ -149,15 +160,41 @@ export function EventForm({
     setEndsAt(value);
   };
 
-  const errorMessage = mutation.isError
-    ? mutation.error instanceof ApiError && mutation.error.status === 409
-      ? 'Цей час на майданчику вже зайнятий. Оберіть інший час або майданчик.'
-      : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
-    : null;
+  // A regular member without a subscription may not create an event in the
+  // subscription-prime window until the access gate opens; block before submit
+  // so they don't fill in a form the backend would reject. Admins and active
+  // subscribers are never gated here.
+  const subStartMin = subPrimeStart ? parseHhMm(subPrimeStart) : null;
+  const subEndMin = subPrimeEnd ? parseHhMm(subPrimeEnd) : null;
+  const start = startsAt ? new Date(startsAt) : null;
+  const end = endsAt ? new Date(endsAt) : null;
+  const primeBlocked =
+    !isAdmin &&
+    !isEdit &&
+    !isSubscriber &&
+    primeMemberOpenHour != null &&
+    subStartMin != null &&
+    subEndMin != null &&
+    subStartMin < subEndMin &&
+    start != null &&
+    end != null &&
+    !Number.isNaN(start.getTime()) &&
+    !Number.isNaN(end.getTime()) &&
+    overlapsPrime(start, end, subStartMin, subEndMin) &&
+    !memberGateOpen(start, primeMemberOpenHour);
+
+  const errorMessage = primeBlocked
+    ? 'Цей час у прайм-абонемент вікні поки недоступний. Він відкриється напередодні події (або одразу — з абонементом).'
+    : mutation.isError
+      ? mutation.error instanceof ApiError && mutation.error.status === 409
+        ? 'Цей час на майданчику вже зайнятий. Оберіть інший час або майданчик.'
+        : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
+      : null;
 
   const canSubmit =
     Boolean(startsAt) &&
     Boolean(endsAt) &&
+    !primeBlocked &&
     (!isGroup || organizerName.trim().length > 0);
 
   const submit = (e: FormEvent): void => {

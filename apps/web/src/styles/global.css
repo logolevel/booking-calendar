@@ -531,6 +531,12 @@ button {
   background-color: rgba(128, 128, 128, 0.16);
 }
 
+/* Subscription-prime slots: a faint pastel-yellow wash so the gated window
+   stands out. */
+.rbc-day-slot .rbc-time-slot.rbc-prime-slot {
+  background-color: rgba(255, 213, 79, 0.16);
+}
+
 .form__error {
   color: var(--destructive);
   font-size: 13px;

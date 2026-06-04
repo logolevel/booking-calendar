@@ -155,6 +155,10 @@ export function App(): JSX.Element {
           role={me.role}
           maxDaysAhead={me.maxDaysAhead}
           bookingOpenHour={me.bookingOpenHour}
+          subPrimeStart={me.subPrimeStart}
+          subPrimeEnd={me.subPrimeEnd}
+          primeMemberOpenHour={me.primeMemberOpenHour}
+          isSubscriber={me.isSubscriber}
         />
       </main>
     </div>

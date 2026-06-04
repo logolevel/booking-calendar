@@ -114,12 +114,26 @@ export class AdminController {
     if (this.toMinutes(dto.primeStart) >= this.toMinutes(dto.primeEnd)) {
       throw new BadRequestException('primeStart must be before primeEnd');
     }
+    if (this.toMinutes(dto.subPrimeStart) >= this.toMinutes(dto.subPrimeEnd)) {
+      throw new BadRequestException('subPrimeStart must be before subPrimeEnd');
+    }
+    // The quota window must sit inside the gated subscription-prime window.
+    if (
+      this.toMinutes(dto.primeStart) < this.toMinutes(dto.subPrimeStart) ||
+      this.toMinutes(dto.primeEnd) > this.toMinutes(dto.subPrimeEnd)
+    ) {
+      throw new BadRequestException(
+        'prime-time window must be within the subscription-prime window',
+      );
+    }
 
     const prev = await this.current();
     await this.settings.setMaxDaysAhead(dto.maxDaysAhead);
     await this.settings.setBookingOpenHour(dto.bookingOpenHour);
     await this.settings.setPrimeStart(dto.primeStart);
     await this.settings.setPrimeEnd(dto.primeEnd);
+    await this.settings.setSubPrimeStart(dto.subPrimeStart);
+    await this.settings.setSubPrimeEnd(dto.subPrimeEnd);
     await this.settings.setPrimeMemberOpenHour(dto.primeMemberOpenHour);
 
     const next: AdminSettingsResponse = {
@@ -127,6 +141,8 @@ export class AdminController {
       bookingOpenHour: dto.bookingOpenHour,
       primeStart: dto.primeStart,
       primeEnd: dto.primeEnd,
+      subPrimeStart: dto.subPrimeStart,
+      subPrimeEnd: dto.subPrimeEnd,
       primeMemberOpenHour: dto.primeMemberOpenHour,
     };
     if (dto.notify) {
@@ -164,6 +180,14 @@ export class AdminController {
         `🔥 Прайм-тайм змінено: тепер ${next.primeStart}–${next.primeEnd}.`,
       );
     }
+    if (
+      next.subPrimeStart !== prev.subPrimeStart ||
+      next.subPrimeEnd !== prev.subPrimeEnd
+    ) {
+      await this.telegram.broadcastToUsers(
+        `⭐ Прайм-абонемент тайм змінено: тепер ${next.subPrimeStart}–${next.subPrimeEnd}.`,
+      );
+    }
     if (next.primeMemberOpenHour !== prev.primeMemberOpenHour) {
       const hh = String(next.primeMemberOpenHour).padStart(2, '0');
       await this.telegram.broadcastToUsers(
@@ -178,12 +202,16 @@ export class AdminController {
       bookingOpenHour,
       primeStart,
       primeEnd,
+      subPrimeStart,
+      subPrimeEnd,
       primeMemberOpenHour,
     ] = await Promise.all([
       this.settings.getMaxDaysAhead(),
       this.settings.getBookingOpenHour(),
       this.settings.getPrimeStart(),
       this.settings.getPrimeEnd(),
+      this.settings.getSubPrimeStart(),
+      this.settings.getSubPrimeEnd(),
       this.settings.getPrimeMemberOpenHour(),
     ]);
     return {
@@ -191,6 +219,8 @@ export class AdminController {
       bookingOpenHour,
       primeStart,
       primeEnd,
+      subPrimeStart,
+      subPrimeEnd,
       primeMemberOpenHour,
     };
   }
