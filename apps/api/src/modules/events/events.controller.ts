@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -12,7 +13,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { PREVIEW_ROLE_HEADER, type EventDto } from '@tg-calendar/shared-types';
+import {
+  PREVIEW_ROLE_HEADER,
+  type EventDto,
+  type PrimeQuotaPreviewResponse,
+} from '@tg-calendar/shared-types';
 import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
@@ -57,6 +62,31 @@ export class EventsController {
       parseDate(from, defaultFrom),
       parseDate(to, defaultTo),
     );
+  }
+
+  @Get('prime-quota')
+  async primeQuota(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Query('startsAt') startsAt: string,
+    @Query('endsAt') endsAt: string,
+    @Query('resourceId') resourceId: string,
+  ): Promise<PrimeQuotaPreviewResponse> {
+    await this.requireAccess(user.id);
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+    const resource = Number(resourceId);
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      !Number.isInteger(resource)
+    ) {
+      throw new BadRequestException('Invalid slot');
+    }
+    return this.events.primeQuotaPreview(user.id, {
+      startsAt: start,
+      endsAt: end,
+      resourceId: resource,
+    });
   }
 
   @Post()

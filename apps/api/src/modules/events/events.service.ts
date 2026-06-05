@@ -10,6 +10,7 @@ import {
   EVENT_TYPE,
   PARTICIPATION_ACTION,
   type EventDto,
+  type PrimeQuotaPreviewResponse,
   type ResourceId,
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -62,6 +63,15 @@ export class EventsService {
     return events.map((event) =>
       this.toDto(event, countMap.get(event.id) ?? 0),
     );
+  }
+
+  // Prime-time quota snapshot for a prospective slot, so the creation form can
+  // warn the user ("N/2") before they submit a slot they cannot book.
+  async primeQuotaPreview(
+    userId: number,
+    input: { startsAt: Date; endsAt: Date; resourceId: number },
+  ): Promise<PrimeQuotaPreviewResponse> {
+    return this.prime.quotaPreview(this.prisma, { userId }, input);
   }
 
   async create(

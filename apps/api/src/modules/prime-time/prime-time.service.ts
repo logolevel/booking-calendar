@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import {
+  GREEN_RESOURCE_ID,
   PRIME_TIME_MAX_GREEN_PER_WEEK,
   PRIME_TIME_MAX_PER_WEEK,
 } from '@tg-calendar/shared-types';
@@ -24,9 +25,6 @@ export type PrimeCheck = { ok: true } | { ok: false; reason: string };
 // The weekly quota applies per booked subject: either an app user (userId) or
 // a reusable guest (guestId). Guests are limited exactly like users.
 export type QuotaSubject = { userId: number } | { guestId: string };
-
-// The green court id; prime-time green bookings are capped at one per week.
-const GREEN_RESOURCE_ID = 1;
 
 // Single source of truth for prime-time access (time gate) and the weekly
 // quota. Shared by event creation, joining, the waitlist and auto-promotion.
@@ -184,39 +182,28 @@ export class PrimeTimeService {
     }
   }
 
-  // Weekly prime-time quota for the booked subject (applies to everyone,
-  // always): at most PRIME_TIME_MAX_PER_WEEK prime slots per week, of which at
-  // most PRIME_TIME_MAX_GREEN_PER_WEEK may be on the green court. Guests are
-  // limited exactly like users (counted by guestId). Pass excludeEventId to
-  // ignore an event the subject is being re-evaluated against.
-  async checkQuota(
+  // Count the subject's prime-time bookings in the same Kyiv week as the event.
+  // Returns inPrime=false (and zero counts) when the event itself is outside the
+  // prime window, so callers can short-circuit. Shared by the quota check and
+  // the creation-time preview.
+  private async countPrimeWeek(
     db: Db,
-    subject: QuotaSubject,
+    where: Prisma.EventParticipantWhereInput,
     event: PrimeEvent,
-    excludeEventId?: string,
-  ): Promise<PrimeCheck> {
+  ): Promise<{ inPrime: boolean; primeCount: number; greenCount: number }> {
     const { start, end } = await this.primeWindow();
     const target = PrimeTimeService.kyivParts(event.startsAt);
     const targetEnd = PrimeTimeService.kyivParts(event.endsAt);
-    // Nothing to enforce unless the new booking itself falls in prime time.
     if (!PrimeTimeService.overlaps(target.minutes, targetEnd.minutes, start, end)) {
-      return { ok: true };
+      return { inPrime: false, primeCount: 0, greenCount: 0 };
     }
 
-    const subjectWhere =
-      'userId' in subject
-        ? { userId: BigInt(subject.userId) }
-        : { guestId: subject.guestId };
     const targetWeek = PrimeTimeService.weekKey(target.dayIndex);
     // Over-fetch a two-week window, then filter to the exact Kyiv week.
     const from = new Date(event.startsAt.getTime() - 8 * 86_400_000);
     const to = new Date(event.startsAt.getTime() + 8 * 86_400_000);
     const rows = await db.eventParticipant.findMany({
-      where: {
-        ...subjectWhere,
-        ...(excludeEventId ? { eventId: { not: excludeEventId } } : {}),
-        event: { startsAt: { gte: from, lte: to } },
-      },
+      where: { ...where, event: { startsAt: { gte: from, lte: to } } },
       include: {
         event: { select: { startsAt: true, endsAt: true, resourceId: true } },
       },
@@ -237,6 +224,55 @@ export class PrimeTimeService {
       if (row.event.resourceId === GREEN_RESOURCE_ID) {
         greenCount += 1;
       }
+    }
+    return { inPrime: true, primeCount, greenCount };
+  }
+
+  private static subjectWhere(
+    subject: QuotaSubject,
+  ): Prisma.EventParticipantWhereInput {
+    return 'userId' in subject
+      ? { userId: BigInt(subject.userId) }
+      : { guestId: subject.guestId };
+  }
+
+  // Read-only quota snapshot for a prospective booking by the subject, used to
+  // warn the creator ("N/2") before they submit. The draft is not yet counted.
+  async quotaPreview(
+    db: Db,
+    subject: QuotaSubject,
+    event: PrimeEvent,
+  ): Promise<{ inPrime: boolean; weekCount: number; greenWeekCount: number }> {
+    const { inPrime, primeCount, greenCount } = await this.countPrimeWeek(
+      db,
+      PrimeTimeService.subjectWhere(subject),
+      event,
+    );
+    return { inPrime, weekCount: primeCount, greenWeekCount: greenCount };
+  }
+
+  // Weekly prime-time quota for the booked subject (applies to everyone,
+  // always): at most PRIME_TIME_MAX_PER_WEEK prime slots per week, of which at
+  // most PRIME_TIME_MAX_GREEN_PER_WEEK may be on the green court. Guests are
+  // limited exactly like users (counted by guestId). Pass excludeEventId to
+  // ignore an event the subject is being re-evaluated against.
+  async checkQuota(
+    db: Db,
+    subject: QuotaSubject,
+    event: PrimeEvent,
+    excludeEventId?: string,
+  ): Promise<PrimeCheck> {
+    const where: Prisma.EventParticipantWhereInput = {
+      ...PrimeTimeService.subjectWhere(subject),
+      ...(excludeEventId ? { eventId: { not: excludeEventId } } : {}),
+    };
+    const { inPrime, primeCount, greenCount } = await this.countPrimeWeek(
+      db,
+      where,
+      event,
+    );
+    if (!inPrime) {
+      return { ok: true };
     }
 
     if (primeCount >= PRIME_TIME_MAX_PER_WEEK) {

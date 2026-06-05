@@ -29,6 +29,9 @@ export type EventType = (typeof EVENT_TYPE)[keyof typeof EVENT_TYPE];
 export const RESOURCE_IDS = [1, 2] as const;
 export type ResourceId = (typeof RESOURCE_IDS)[number];
 
+// The green court (🟢 №1). Its prime-time weekly sub-limit is stricter.
+export const GREEN_RESOURCE_ID = 1;
+
 export const MIN_CAPACITY = 2;
 export const MAX_CAPACITY = 8;
 export const DEFAULT_CAPACITY = 6;
@@ -175,6 +178,18 @@ export interface EventDto {
   startsAt: string;
   endsAt: string;
   createdBy: number;
+}
+
+// Prime-time weekly quota status for a prospective slot, shown to the creator
+// before they submit so they understand the "N/2" limit. Counts the creator's
+// current bookings in that slot's week; the draft itself is not yet counted.
+export interface PrimeQuotaPreviewResponse {
+  // Whether the slot overlaps the weekly-quota prime window at all.
+  inPrime: boolean;
+  // Bookings the user already holds in that Kyiv week (against the max).
+  weekCount: number;
+  // Of those, how many are on the green court (against the green max).
+  greenWeekCount: number;
 }
 
 export interface CreateEventRequest {

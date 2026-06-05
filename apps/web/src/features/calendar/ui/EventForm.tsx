@@ -3,14 +3,17 @@ import { format } from 'date-fns';
 import {
   DEFAULT_CAPACITY,
   EVENT_TYPE,
+  GREEN_RESOURCE_ID,
   MAX_CAPACITY,
   MIN_CAPACITY,
+  PRIME_TIME_MAX_GREEN_PER_WEEK,
+  PRIME_TIME_MAX_PER_WEEK,
   RESOURCE_IDS,
   type EventDto,
   type EventType,
   type ResourceId,
 } from '@tg-calendar/shared-types';
-import { useCreateEvent, useUpdateEvent } from '../useEvents';
+import { useCreateEvent, usePrimeQuota, useUpdateEvent } from '../useEvents';
 import { memberGateOpen, overlapsPrime, parseHhMm } from '../model/slotTime';
 import { eventTypeLabel, resourceLabel } from '../eventLabels';
 import { ApiError } from '../../../shared/api/client';
@@ -183,18 +186,46 @@ export function EventForm({
     overlapsPrime(start, end, subStartMin, subEndMin) &&
     !memberGateOpen(start, primeMemberOpenHour);
 
+  // The weekly prime-time quota applies to the creator's auto-join, i.e. only
+  // for a brand-new event the creator actually joins. Preview it so the user
+  // sees their "N/2" status and learns up front why a slot may be unavailable.
+  const validStart = start != null && !Number.isNaN(start.getTime());
+  const validEnd = end != null && !Number.isNaN(end.getTime());
+  const quotaRelevant = !isEdit && !isGroup && !(isAdmin && skipSelf);
+  const startIso = validStart ? start.toISOString() : null;
+  const endIso = validEnd ? end.toISOString() : null;
+  const { data: quota } = usePrimeQuota(
+    startIso,
+    endIso,
+    resourceId,
+    quotaRelevant,
+  );
+  const quotaInPrime = quotaRelevant && (quota?.inPrime ?? false);
+  const atPrimeLimit =
+    quotaInPrime && (quota?.weekCount ?? 0) >= PRIME_TIME_MAX_PER_WEEK;
+  const atGreenLimit =
+    quotaInPrime &&
+    resourceId === GREEN_RESOURCE_ID &&
+    (quota?.greenWeekCount ?? 0) >= PRIME_TIME_MAX_GREEN_PER_WEEK;
+  const quotaBlocked = atPrimeLimit || atGreenLimit;
+
   const errorMessage = primeBlocked
     ? 'Цей час у прайм-абонемент вікні поки недоступний. Він відкриється напередодні події (або одразу — з абонементом).'
-    : mutation.isError
-      ? mutation.error instanceof ApiError && mutation.error.status === 409
-        ? 'Цей час на майданчику вже зайнятий. Оберіть інший час або майданчик.'
-        : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
-      : null;
+    : atPrimeLimit
+      ? `У прайм-тайм можна записатися не більше ${PRIME_TIME_MAX_PER_WEEK} разів на тиждень. Цього тижня ліміт вичерпано.`
+      : atGreenLimit
+        ? 'На зелений майданчик у прайм-тайм можна записатися лише раз на тиждень. Оберіть червоний майданчик.'
+        : mutation.isError
+          ? mutation.error instanceof ApiError && mutation.error.status === 409
+            ? 'Цей час на майданчику вже зайнятий. Оберіть інший час або майданчик.'
+            : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
+          : null;
 
   const canSubmit =
     Boolean(startsAt) &&
     Boolean(endsAt) &&
     !primeBlocked &&
+    !quotaBlocked &&
     (!isGroup || organizerName.trim().length > 0);
 
   const submit = (e: FormEvent): void => {
@@ -341,6 +372,21 @@ export function EventForm({
           onChange={(e) => onEndChange(e.target.value)}
         />
       </label>
+
+      {quotaInPrime && (
+        <div className="form__prime">
+          <span
+            className={`participants__quota${
+              atPrimeLimit ? ' participants__quota--full' : ''
+            }`}
+          >
+            {quota?.weekCount ?? 0}/{PRIME_TIME_MAX_PER_WEEK}
+          </span>
+          <span className="form__prime-text">
+            ваші записи у прайм-тайм цього тижня
+          </span>
+        </div>
+      )}
 
       {isAdmin && !isGroup && !isEdit && (
         <label className="participants__checkbox field">
