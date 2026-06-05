@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Role } from '@tg-calendar/shared-types';
+import type { PreviewMode } from '@tg-calendar/shared-types';
 import {
   getPreviewRole,
   setPreviewRole,
@@ -8,8 +8,8 @@ import {
 } from '../../shared/api/preview';
 
 interface PreviewControls {
-  preview: Role | null;
-  setPreview: (role: Role | null) => void;
+  preview: PreviewMode | null;
+  setPreview: (role: PreviewMode | null) => void;
 }
 
 export function usePreviewRole(): PreviewControls {
@@ -20,7 +20,7 @@ export function usePreviewRole(): PreviewControls {
   );
   const queryClient = useQueryClient();
 
-  const setPreview = (role: Role | null): void => {
+  const setPreview = (role: PreviewMode | null): void => {
     setPreviewRole(role);
     void queryClient.invalidateQueries();
   };

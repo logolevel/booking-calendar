@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
+import { PREVIEW_MODE } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
 
@@ -68,7 +69,9 @@ export class AccessService {
   }
 
   // Apply a previewed role, but only when the real user is an admin.
-  // This prevents non-admins from escalating via the preview header.
+  // This prevents non-admins from escalating via the preview header. The
+  // "subscriber" mode previews a member (role-wise) holding a subscription, so
+  // it resolves to the member role; its perks are reported via previewSubscriber.
   applyPreview(realRole: Role | null, preview?: string | null): Role | null {
     if (realRole !== Role.admin || !preview) {
       return realRole;
@@ -80,7 +83,29 @@ export class AccessService {
     ) {
       return preview;
     }
+    if (preview === PREVIEW_MODE.SUBSCRIBER) {
+      return Role.member;
+    }
     return realRole;
+  }
+
+  // Subscription status to report under a preview; undefined means "use the
+  // real value". Lets an admin emulate a subscriber (true) or a plain
+  // member/guest without subscription perks (false). Admin-only, like the role.
+  previewSubscriber(
+    realRole: Role | null,
+    preview?: string | null,
+  ): boolean | undefined {
+    if (realRole !== Role.admin || !preview) {
+      return undefined;
+    }
+    if (preview === PREVIEW_MODE.SUBSCRIBER) {
+      return true;
+    }
+    if (preview === Role.member || preview === Role.external) {
+      return false;
+    }
+    return undefined;
   }
 
   async syncUser(user: VerifiedTelegramUser, role: Role): Promise<void> {

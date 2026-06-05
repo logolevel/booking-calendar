@@ -143,6 +143,8 @@ interface Props {
   role: Role;
   maxDaysAhead: number;
   bookingOpenHour: number;
+  primeStart: string;
+  primeEnd: string;
   subPrimeStart: string;
   subPrimeEnd: string;
   primeMemberOpenHour: number;
@@ -153,6 +155,8 @@ export function CalendarView({
   role,
   maxDaysAhead,
   bookingOpenHour,
+  primeStart,
+  primeEnd,
   subPrimeStart,
   subPrimeEnd,
   primeMemberOpenHour,
@@ -171,19 +175,51 @@ export function CalendarView({
   const canCreate = role === ROLE.ADMIN || role === ROLE.MEMBER;
   const isAdmin = role === ROLE.ADMIN;
 
-  // Subscription-prime window (the yellow band) in minutes-of-day.
+  // Subscription-prime window (the access-gate band) in minutes-of-day.
   const subPrime = useMemo(() => {
     const start = parseHhMm(subPrimeStart);
     const end = parseHhMm(subPrimeEnd);
     return start != null && end != null && start < end ? { start, end } : null;
   }, [subPrimeStart, subPrimeEnd]);
 
-  // Subtle pastel-yellow highlight on every subscription-prime slot, all roles.
-  const slotPropGetter = (slot: Date): { className?: string } => {
-    if (subPrime && isPrimeSlot(slot, subPrime.start, subPrime.end)) {
-      return { className: 'rbc-prime-slot' };
+  // Prime-time window (the weekly-quota band) in minutes-of-day.
+  const prime = useMemo(() => {
+    const start = parseHhMm(primeStart);
+    const end = parseHhMm(primeEnd);
+    return start != null && end != null && start < end ? { start, end } : null;
+  }, [primeStart, primeEnd]);
+
+  // Whether this viewer is barred from booking the given slot's subscription-
+  // prime window: admins and active subscribers always pass; other members must
+  // wait for the access gate to open the day before the event.
+  const subPrimeSlotBlocked = (slot: Date): boolean => {
+    if (isAdmin || isSubscriber || !subPrime) {
+      return false;
     }
-    return {};
+    if (!isPrimeSlot(slot, subPrime.start, subPrime.end)) {
+      return false;
+    }
+    return !memberGateOpen(slot, primeMemberOpenHour);
+  };
+
+  // Highlight slots to convey current restrictions for THIS viewer:
+  // - yellow wash only where the access gate currently blocks them;
+  // - a gold outline marks the prime-time (weekly-quota) window for everyone.
+  const slotPropGetter = (slot: Date): { className?: string } => {
+    const classes: string[] = [];
+    if (subPrimeSlotBlocked(slot)) {
+      classes.push('rbc-prime-slot');
+    }
+    if (prime && isPrimeSlot(slot, prime.start, prime.end)) {
+      classes.push('rbc-prime-quota');
+      if (isPrimeSlot(slot, prime.start, prime.start + STEP_MIN)) {
+        classes.push('rbc-prime-quota-start');
+      }
+      if (isPrimeSlot(slot, prime.end - STEP_MIN, prime.end)) {
+        classes.push('rbc-prime-quota-end');
+      }
+    }
+    return classes.length > 0 ? { className: classes.join(' ') } : {};
   };
 
   // Whether a regular member is currently barred from booking a slot in the

@@ -1,15 +1,15 @@
-import type { Role } from '@tg-calendar/shared-types';
+import type { PreviewMode } from '@tg-calendar/shared-types';
 
 // Admin-only role preview. Stored outside React so the API client can read it
 // synchronously when building request headers.
-let current: Role | null = null;
+let current: PreviewMode | null = null;
 const listeners = new Set<() => void>();
 
-export function getPreviewRole(): Role | null {
+export function getPreviewRole(): PreviewMode | null {
   return current;
 }
 
-export function setPreviewRole(role: Role | null): void {
+export function setPreviewRole(role: PreviewMode | null): void {
   current = role;
   listeners.forEach((listener) => listener());
 }

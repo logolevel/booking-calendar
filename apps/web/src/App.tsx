@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ROLE, type Role } from '@tg-calendar/shared-types';
+import { PREVIEW_MODE, ROLE, type PreviewMode } from '@tg-calendar/shared-types';
 import { useMe } from './features/auth/useMe';
 import { usePreviewRole } from './features/auth/usePreviewRole';
 import { RoleSwitch } from './features/auth/ui/RoleSwitch';
@@ -11,10 +11,11 @@ import { AdminsSheet } from './features/admin/ui/AdminsSheet';
 import { SubscriptionsSheet } from './features/subscriptions/ui/SubscriptionsSheet';
 import { UsersSheet } from './features/directory/ui/UsersSheet';
 
-const ROLE_LABELS: Record<Role, string> = {
-  [ROLE.ADMIN]: 'Адмін',
-  [ROLE.MEMBER]: 'Учасник',
-  [ROLE.EXTERNAL]: 'Гість',
+const PREVIEW_LABELS: Record<PreviewMode, string> = {
+  [PREVIEW_MODE.ADMIN]: 'Адмін',
+  [PREVIEW_MODE.SUBSCRIBER]: 'Власник абонемента',
+  [PREVIEW_MODE.MEMBER]: 'Учасник',
+  [PREVIEW_MODE.EXTERNAL]: 'Гість',
 };
 
 function StateScreen({
@@ -80,7 +81,8 @@ export function App(): JSX.Element {
     );
   }
 
-  const isPreviewing = me.isAdmin && me.role !== ROLE.ADMIN;
+  const previewMode: PreviewMode = me.isAdmin ? (preview ?? PREVIEW_MODE.ADMIN) : me.role;
+  const isPreviewing = me.isAdmin && previewMode !== PREVIEW_MODE.ADMIN;
 
   return (
     <div className="app">
@@ -125,12 +127,14 @@ export function App(): JSX.Element {
               </>
             )}
             <RoleSwitch
-              value={preview ?? ROLE.ADMIN}
-              onChange={(role) => setPreview(role === ROLE.ADMIN ? null : role)}
+              value={previewMode}
+              onChange={(mode) =>
+                setPreview(mode === PREVIEW_MODE.ADMIN ? null : mode)
+              }
             />
           </div>
         ) : (
-          <span className="chip chip--accent">{ROLE_LABELS[me.role]}</span>
+          <span className="chip chip--accent">{PREVIEW_LABELS[me.role]}</span>
         )}
       </header>
 
@@ -141,7 +145,7 @@ export function App(): JSX.Element {
       <main className="app__main">
         {isPreviewing && (
           <div className="preview-bar">
-            <span>👁 Перегляд як «{ROLE_LABELS[me.role]}»</span>
+            <span>👁 Перегляд як «{PREVIEW_LABELS[previewMode]}»</span>
             <button
               type="button"
               className="btn btn--ghost"
@@ -155,6 +159,8 @@ export function App(): JSX.Element {
           role={me.role}
           maxDaysAhead={me.maxDaysAhead}
           bookingOpenHour={me.bookingOpenHour}
+          primeStart={me.primeStart}
+          primeEnd={me.primeEnd}
           subPrimeStart={me.subPrimeStart}
           subPrimeEnd={me.subPrimeEnd}
           primeMemberOpenHour={me.primeMemberOpenHour}

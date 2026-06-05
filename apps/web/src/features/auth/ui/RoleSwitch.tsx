@@ -1,14 +1,15 @@
-import { ROLE, type Role } from '@tg-calendar/shared-types';
+import { PREVIEW_MODE, type PreviewMode } from '@tg-calendar/shared-types';
 
-const OPTIONS: { value: Role; label: string }[] = [
-  { value: ROLE.ADMIN, label: 'Адмін' },
-  { value: ROLE.MEMBER, label: 'Учасник' },
-  { value: ROLE.EXTERNAL, label: 'Гість' },
+const OPTIONS: { value: PreviewMode; label: string }[] = [
+  { value: PREVIEW_MODE.ADMIN, label: 'Адмін' },
+  { value: PREVIEW_MODE.SUBSCRIBER, label: 'Власник абонемента' },
+  { value: PREVIEW_MODE.MEMBER, label: 'Учасник' },
+  { value: PREVIEW_MODE.EXTERNAL, label: 'Гість' },
 ];
 
 interface Props {
-  value: Role;
-  onChange: (role: Role) => void;
+  value: PreviewMode;
+  onChange: (mode: PreviewMode) => void;
 }
 
 export function RoleSwitch({ value, onChange }: Props): JSX.Element {
@@ -18,7 +19,7 @@ export function RoleSwitch({ value, onChange }: Props): JSX.Element {
         className="role-switch__select"
         value={value}
         aria-label="Переглянути як роль"
-        onChange={(e) => onChange(e.target.value as Role)}
+        onChange={(e) => onChange(e.target.value as PreviewMode)}
       >
         {OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>

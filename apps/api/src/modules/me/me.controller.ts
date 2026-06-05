@@ -42,7 +42,14 @@ export class MeController {
     await this.access.syncUser(user, realRole);
     const stored = await this.me.getStored(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
-    return this.build(user, stored, role, realRole === Role.admin);
+    const forcedSubscriber = this.access.previewSubscriber(realRole, preview);
+    return this.build(
+      user,
+      stored,
+      role,
+      realRole === Role.admin,
+      forcedSubscriber,
+    );
   }
 
   @Post('me/onboarding')
@@ -58,7 +65,14 @@ export class MeController {
     await this.access.syncUser(user, realRole);
     const stored = await this.me.completeOnboarding(user.id, dto);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
-    return this.build(user, stored, role, realRole === Role.admin);
+    const forcedSubscriber = this.access.previewSubscriber(realRole, preview);
+    return this.build(
+      user,
+      stored,
+      role,
+      realRole === Role.admin,
+      forcedSubscriber,
+    );
   }
 
   private async build(
@@ -66,10 +80,14 @@ export class MeController {
     stored: User | null,
     role: Role,
     isAdmin: boolean,
+    // When set, overrides the real subscription status (admin role preview).
+    forcedSubscriber?: boolean,
   ): Promise<MeResponse> {
     const [
       maxDaysAhead,
       bookingOpenHour,
+      primeStart,
+      primeEnd,
       subPrimeStart,
       subPrimeEnd,
       primeMemberOpenHour,
@@ -77,6 +95,8 @@ export class MeController {
     ] = await Promise.all([
       this.settings.getMaxDaysAhead(),
       this.settings.getBookingOpenHour(),
+      this.settings.getPrimeStart(),
+      this.settings.getPrimeEnd(),
       this.settings.getSubPrimeStart(),
       this.settings.getSubPrimeEnd(),
       this.settings.getPrimeMemberOpenHour(),
@@ -93,10 +113,12 @@ export class MeController {
       profileComplete: Boolean(stored?.onboardedAt && stored.gender),
       maxDaysAhead,
       bookingOpenHour,
+      primeStart,
+      primeEnd,
       subPrimeStart,
       subPrimeEnd,
       primeMemberOpenHour,
-      isSubscriber,
+      isSubscriber: forcedSubscriber ?? isSubscriber,
     };
   }
 }

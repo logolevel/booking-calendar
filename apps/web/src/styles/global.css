@@ -531,10 +531,26 @@ button {
   background-color: rgba(128, 128, 128, 0.16);
 }
 
-/* Subscription-prime slots: a faint pastel-yellow wash so the gated window
-   stands out. */
+/* Subscription-prime slots the viewer cannot book yet: a faint pastel-yellow
+   wash that marks the active access-gate restriction (hidden once they can
+   book — for admins, subscribers, and members after the gate opens). */
 .rbc-day-slot .rbc-time-slot.rbc-prime-slot {
   background-color: rgba(255, 213, 79, 0.16);
+}
+
+/* Prime-time (weekly-quota) window: a gold outline only — no fill, since it
+   overlaps the subscription-prime band. Shown to every role for awareness. */
+.rbc-day-slot .rbc-time-slot.rbc-prime-quota {
+  border-left: 2px solid rgba(214, 158, 30, 0.85);
+  border-right: 2px solid rgba(214, 158, 30, 0.85);
+}
+
+.rbc-day-slot .rbc-time-slot.rbc-prime-quota-start {
+  border-top: 2px solid rgba(214, 158, 30, 0.85);
+}
+
+.rbc-day-slot .rbc-time-slot.rbc-prime-quota-end {
+  border-bottom: 2px solid rgba(214, 158, 30, 0.85);
 }
 
 .form__error {
