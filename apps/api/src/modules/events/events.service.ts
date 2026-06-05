@@ -19,6 +19,13 @@ import type { CreateEventDto } from './dto/create-event.dto';
 
 type Db = Prisma.TransactionClient;
 
+// Name of the Postgres EXCLUDE constraint that forbids overlapping events on the
+// same court (see migration 20260605000000_event_no_overlap).
+const OVERLAP_CONSTRAINT = 'Event_no_overlap';
+// SQLSTATE raised by Postgres on an exclusion-constraint violation.
+const EXCLUSION_VIOLATION_SQLSTATE = '23P01';
+const OVERLAP_MESSAGE = 'This court is already booked for the selected time';
+
 interface EventRow {
   id: string;
   type: string;
@@ -85,46 +92,48 @@ export class EventsService {
     // Create the event and the creator's own participation in one transaction:
     // the prime-time gate and weekly quota apply to the auto-join exactly as
     // they do to joining an existing event, so they cannot be bypassed here.
-    const event = await this.prisma.$transaction(async (tx) => {
-      await this.assertNoOverlap(tx, dto.resourceId, startsAt, endsAt);
-      const created = await tx.event.create({
-        data: {
-          type: dto.type,
-          resourceId: dto.resourceId,
-          title: dto.title ?? null,
-          capacity: dto.capacity,
-          allowEmpty: isAdmin,
-          organizerName: isGroup ? dto.organizerName ?? null : null,
-          organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
-          groupSize: isGroup ? dto.groupSize ?? null : null,
-          startsAt,
-          endsAt,
-          createdBy: BigInt(userId),
-        },
-      });
-
-      if (joinSelf) {
-        await this.prime.assertAccess(tx, userId, role, created);
-        await this.prime.assertQuota(tx, userId, created);
-        await tx.eventParticipant.create({
+    const event = await this.runGuardingOverlap(() =>
+      this.prisma.$transaction(async (tx) => {
+        await this.assertNoOverlap(tx, dto.resourceId, startsAt, endsAt);
+        const created = await tx.event.create({
           data: {
-            eventId: created.id,
-            userId: BigInt(userId),
-            addedByUserId: BigInt(userId),
+            type: dto.type,
+            resourceId: dto.resourceId,
+            title: dto.title ?? null,
+            capacity: dto.capacity,
+            allowEmpty: isAdmin,
+            organizerName: isGroup ? dto.organizerName ?? null : null,
+            organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+            groupSize: isGroup ? dto.groupSize ?? null : null,
+            startsAt,
+            endsAt,
+            createdBy: BigInt(userId),
           },
         });
-        await tx.eventParticipationLog.create({
-          data: {
-            eventId: created.id,
-            actorUserId: BigInt(userId),
-            targetUserId: BigInt(userId),
-            action: PARTICIPATION_ACTION.JOIN,
-          },
-        });
-      }
 
-      return created;
-    });
+        if (joinSelf) {
+          await this.prime.assertAccess(tx, userId, role, created);
+          await this.prime.assertQuota(tx, userId, created);
+          await tx.eventParticipant.create({
+            data: {
+              eventId: created.id,
+              userId: BigInt(userId),
+              addedByUserId: BigInt(userId),
+            },
+          });
+          await tx.eventParticipationLog.create({
+            data: {
+              eventId: created.id,
+              actorUserId: BigInt(userId),
+              targetUserId: BigInt(userId),
+              action: PARTICIPATION_ACTION.JOIN,
+            },
+          });
+        }
+
+        return created;
+      }),
+    );
 
     return this.toDto(event, joinSelf ? 1 : 0);
   }
@@ -172,22 +181,25 @@ export class EventsService {
 
     const isGroup = dto.type === EVENT_TYPE.GROUP;
 
-    await this.assertNoOverlap(this.prisma, dto.resourceId, startsAt, endsAt, id);
-
-    const event = await this.prisma.event.update({
-      where: { id },
-      data: {
-        type: dto.type,
-        resourceId: dto.resourceId,
-        title: dto.title ?? null,
-        capacity: dto.capacity,
-        organizerName: isGroup ? dto.organizerName ?? null : null,
-        organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
-        groupSize: isGroup ? dto.groupSize ?? null : null,
-        startsAt,
-        endsAt,
-      },
-    });
+    const event = await this.runGuardingOverlap(() =>
+      this.prisma.$transaction(async (tx) => {
+        await this.assertNoOverlap(tx, dto.resourceId, startsAt, endsAt, id);
+        return tx.event.update({
+          where: { id },
+          data: {
+            type: dto.type,
+            resourceId: dto.resourceId,
+            title: dto.title ?? null,
+            capacity: dto.capacity,
+            organizerName: isGroup ? dto.organizerName ?? null : null,
+            organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+            groupSize: isGroup ? dto.groupSize ?? null : null,
+            startsAt,
+            endsAt,
+          },
+        });
+      }),
+    );
     return this.toDto(event, await this.countParticipants(id));
   }
 
@@ -218,6 +230,8 @@ export class EventsService {
 
   // Two events on the same resource (court) may not overlap in time.
   // Overlap: existing.startsAt < newEndsAt AND existing.endsAt > newStartsAt.
+  // This is a fast, friendly pre-check; the hard guarantee against concurrent
+  // double-booking is the Postgres EXCLUDE constraint (see runGuardingOverlap).
   private async assertNoOverlap(
     db: Db,
     resourceId: number,
@@ -234,10 +248,41 @@ export class EventsService {
       },
     });
     if (conflict) {
-      throw new ConflictException(
-        'This court is already booked for the selected time',
-      );
+      throw new ConflictException(OVERLAP_MESSAGE);
     }
+  }
+
+  // Run a write and translate the Postgres exclusion-constraint violation (two
+  // concurrent transactions both passing assertNoOverlap, then racing to INSERT)
+  // into the same 409 the pre-check would have raised. Other errors pass through.
+  private async runGuardingOverlap<T>(run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (EventsService.isOverlapViolation(error)) {
+        throw new ConflictException(OVERLAP_MESSAGE);
+      }
+      throw error;
+    }
+  }
+
+  private static isOverlapViolation(error: unknown): boolean {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      const meta = error.meta as { constraint?: unknown } | undefined;
+      if (
+        typeof meta?.constraint === 'string' &&
+        meta.constraint.includes(OVERLAP_CONSTRAINT)
+      ) {
+        return true;
+      }
+    }
+    // Prisma has no dedicated code for exclusion violations, so fall back to the
+    // SQLSTATE / constraint name carried in the raw error message.
+    return (
+      error instanceof Error &&
+      (error.message.includes(OVERLAP_CONSTRAINT) ||
+        error.message.includes(EXCLUSION_VIOLATION_SQLSTATE))
+    );
   }
 
   private async assertWithinDateLimit(startsAt: Date): Promise<void> {

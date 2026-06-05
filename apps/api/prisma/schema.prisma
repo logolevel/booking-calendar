@@ -98,6 +98,10 @@ model Event {
   waitlist     EventWaitlist[]
   logs         EventParticipationLog[]
 
+  // A Postgres EXCLUDE constraint ("Event_no_overlap") forbids two events on the
+  // same resourceId from overlapping in time. It cannot be expressed in Prisma
+  // schema, so it lives in migration 20260605000000_event_no_overlap and must be
+  // kept in sync manually. Violations surface as SQLSTATE 23P01 -> 409 Conflict.
   @@index([startsAt])
 }
 
