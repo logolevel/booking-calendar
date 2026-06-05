@@ -222,6 +222,9 @@ export interface ParticipantDto {
   isSelf: boolean;
   canRemove: boolean;
   joinedAt: string;
+  // Prime-time bookings this subject (user or guest) holds for the viewed
+  // event's week. Shown against PRIME_TIME_MAX_PER_WEEK (e.g. "1/2").
+  primeWeekCount: number | null;
 }
 
 export interface WaitlistEntryDto {

@@ -21,6 +21,10 @@ export interface PrimeEvent {
 
 export type PrimeCheck = { ok: true } | { ok: false; reason: string };
 
+// The weekly quota applies per booked subject: either an app user (userId) or
+// a reusable guest (guestId). Guests are limited exactly like users.
+export type QuotaSubject = { userId: number } | { guestId: string };
+
 // The green court id; prime-time green bookings are capped at one per week.
 const GREEN_RESOURCE_ID = 1;
 
@@ -117,29 +121,38 @@ export class PrimeTimeService {
 
   // Time gate: a regular member may take a subscription-prime slot only from
   // primeMemberOpenHour on the day before the event. The acting admin, the
-  // booked admin/root and active subscribers bypass it. The weekly quota is
-  // separate and applies to everyone.
+  // booked admin/root and active subscribers bypass it. Guests carry no
+  // subscription, so they are gated exactly like a plain member. The weekly
+  // quota is separate and applies to everyone.
   async checkAccess(
     db: Db,
-    bookedUserId: number,
+    subject: QuotaSubject,
     actorRole: Role,
     event: PrimeEvent,
   ): Promise<PrimeCheck> {
     if (!(await this.eventInSubPrime(event))) {
       return { ok: true };
     }
-    if (actorRole === Role.admin || this.access.isRoot(bookedUserId)) {
+    if (actorRole === Role.admin) {
       return { ok: true };
     }
-    const bookedUser = await db.user.findUnique({
-      where: { id: BigInt(bookedUserId) },
-      select: { isAdmin: true },
-    });
-    if (bookedUser?.isAdmin) {
-      return { ok: true };
-    }
-    if (await this.subscriptions.isActive(bookedUserId)) {
-      return { ok: true };
+    // User subjects may bypass the gate (root, admin, active subscriber);
+    // guests never can — they behave like a member without a subscription.
+    if ('userId' in subject) {
+      const bookedUserId = subject.userId;
+      if (this.access.isRoot(bookedUserId)) {
+        return { ok: true };
+      }
+      const bookedUser = await db.user.findUnique({
+        where: { id: BigInt(bookedUserId) },
+        select: { isAdmin: true },
+      });
+      if (bookedUser?.isAdmin) {
+        return { ok: true };
+      }
+      if (await this.subscriptions.isActive(bookedUserId)) {
+        return { ok: true };
+      }
     }
 
     const openHour = await this.settings.getPrimeMemberOpenHour();
@@ -161,23 +174,24 @@ export class PrimeTimeService {
 
   async assertAccess(
     db: Db,
-    bookedUserId: number,
+    subject: QuotaSubject,
     actorRole: Role,
     event: PrimeEvent,
   ): Promise<void> {
-    const result = await this.checkAccess(db, bookedUserId, actorRole, event);
+    const result = await this.checkAccess(db, subject, actorRole, event);
     if (!result.ok) {
       throw new ForbiddenException(result.reason);
     }
   }
 
-  // Weekly prime-time quota for the user being booked (applies to everyone,
+  // Weekly prime-time quota for the booked subject (applies to everyone,
   // always): at most PRIME_TIME_MAX_PER_WEEK prime slots per week, of which at
-  // most PRIME_TIME_MAX_GREEN_PER_WEEK may be on the green court. Pass
-  // excludeEventId to ignore an event the user is being re-evaluated against.
+  // most PRIME_TIME_MAX_GREEN_PER_WEEK may be on the green court. Guests are
+  // limited exactly like users (counted by guestId). Pass excludeEventId to
+  // ignore an event the subject is being re-evaluated against.
   async checkQuota(
     db: Db,
-    userId: number,
+    subject: QuotaSubject,
     event: PrimeEvent,
     excludeEventId?: string,
   ): Promise<PrimeCheck> {
@@ -189,13 +203,17 @@ export class PrimeTimeService {
       return { ok: true };
     }
 
+    const subjectWhere =
+      'userId' in subject
+        ? { userId: BigInt(subject.userId) }
+        : { guestId: subject.guestId };
     const targetWeek = PrimeTimeService.weekKey(target.dayIndex);
     // Over-fetch a two-week window, then filter to the exact Kyiv week.
     const from = new Date(event.startsAt.getTime() - 8 * 86_400_000);
     const to = new Date(event.startsAt.getTime() + 8 * 86_400_000);
     const rows = await db.eventParticipant.findMany({
       where: {
-        userId: BigInt(userId),
+        ...subjectWhere,
         ...(excludeEventId ? { eventId: { not: excludeEventId } } : {}),
         event: { startsAt: { gte: from, lte: to } },
       },
@@ -240,13 +258,76 @@ export class PrimeTimeService {
     return { ok: true };
   }
 
+  // Count current prime-time bookings each subject holds in the same Kyiv week
+  // as the given event. Used to surface a "1/2" status next to participants; it
+  // mirrors checkQuota's counting (active EventParticipant rows only) but for a
+  // batch of users and guests in one query to avoid N+1.
+  async countPrimeWeekForSubjects(
+    db: Db,
+    subjects: { userIds: number[]; guestIds: string[] },
+    event: PrimeEvent,
+  ): Promise<{ users: Map<number, number>; guests: Map<string, number> }> {
+    const users = new Map<number, number>();
+    const guests = new Map<string, number>();
+    const userIds = [...new Set(subjects.userIds)];
+    const guestIds = [...new Set(subjects.guestIds)];
+    for (const id of userIds) {
+      users.set(id, 0);
+    }
+    for (const id of guestIds) {
+      guests.set(id, 0);
+    }
+    if (userIds.length === 0 && guestIds.length === 0) {
+      return { users, guests };
+    }
+
+    const { start, end } = await this.primeWindow();
+    const target = PrimeTimeService.kyivParts(event.startsAt);
+    const targetWeek = PrimeTimeService.weekKey(target.dayIndex);
+    const from = new Date(event.startsAt.getTime() - 8 * 86_400_000);
+    const to = new Date(event.startsAt.getTime() + 8 * 86_400_000);
+    const or: Prisma.EventParticipantWhereInput[] = [];
+    if (userIds.length > 0) {
+      or.push({ userId: { in: userIds.map((id) => BigInt(id)) } });
+    }
+    if (guestIds.length > 0) {
+      or.push({ guestId: { in: guestIds } });
+    }
+    const rows = await db.eventParticipant.findMany({
+      where: { OR: or, event: { startsAt: { gte: from, lte: to } } },
+      include: {
+        event: { select: { startsAt: true, endsAt: true } },
+      },
+    });
+
+    for (const row of rows) {
+      const s = PrimeTimeService.kyivParts(row.event.startsAt);
+      const e = PrimeTimeService.kyivParts(row.event.endsAt);
+      if (PrimeTimeService.weekKey(s.dayIndex) !== targetWeek) {
+        continue;
+      }
+      if (!PrimeTimeService.overlaps(s.minutes, e.minutes, start, end)) {
+        continue;
+      }
+      if (row.userId != null) {
+        const uid = Number(row.userId);
+        if (users.has(uid)) {
+          users.set(uid, (users.get(uid) ?? 0) + 1);
+        }
+      } else if (row.guestId != null && guests.has(row.guestId)) {
+        guests.set(row.guestId, (guests.get(row.guestId) ?? 0) + 1);
+      }
+    }
+    return { users, guests };
+  }
+
   async assertQuota(
     db: Db,
-    userId: number,
+    subject: QuotaSubject,
     event: PrimeEvent,
     excludeEventId?: string,
   ): Promise<void> {
-    const result = await this.checkQuota(db, userId, event, excludeEventId);
+    const result = await this.checkQuota(db, subject, event, excludeEventId);
     if (!result.ok) {
       throw new ForbiddenException(result.reason);
     }

@@ -181,11 +181,21 @@ export class ParticipationService {
       const headId = Number(head.userId);
       // System promotion: judge access by the queued user's own status
       // (member role) — admins/subscribers are recognised inside the check.
-      const access = await this.prime.checkAccess(tx, headId, Role.member, event);
+      const access = await this.prime.checkAccess(
+        tx,
+        { userId: headId },
+        Role.member,
+        event,
+      );
       if (!access.ok) {
         continue;
       }
-      const eligible = await this.prime.checkQuota(tx, headId, event, eventId);
+      const eligible = await this.prime.checkQuota(
+        tx,
+        { userId: headId },
+        event,
+        eventId,
+      );
       if (!eligible.ok) {
         continue;
       }
@@ -223,8 +233,8 @@ export class ParticipationService {
       if (count >= event.capacity) {
         throw new ConflictException('Event is full');
       }
-      await this.prime.assertAccess(tx, actorId, role, event);
-      await this.prime.assertQuota(tx, actorId, event, eventId);
+      await this.prime.assertAccess(tx, { userId: actorId }, role, event);
+      await this.prime.assertQuota(tx, { userId: actorId }, event, eventId);
       await tx.eventParticipant.create({
         data: {
           eventId,
@@ -290,8 +300,8 @@ export class ParticipationService {
       }
 
       // The access gate and quota apply to the person being booked.
-      await this.prime.assertAccess(tx, targetUserId, role, event);
-      await this.prime.assertQuota(tx, targetUserId, event, eventId);
+      await this.prime.assertAccess(tx, { userId: targetUserId }, role, event);
+      await this.prime.assertQuota(tx, { userId: targetUserId }, event, eventId);
 
       await tx.eventParticipant.create({
         data: {
@@ -382,6 +392,9 @@ export class ParticipationService {
         throw new ConflictException('Guest is already a participant');
       }
       await this.assertCanAddExtra(tx, eventId, actorId, role, event.capacity);
+      // Guests carry no subscription: gated like a member without one.
+      await this.prime.assertAccess(tx, { guestId }, role, event);
+      await this.prime.assertQuota(tx, { guestId }, event, eventId);
       await tx.eventParticipant.create({
         data: { eventId, guestId, addedByUserId: BigInt(actorId) },
       });
@@ -409,6 +422,10 @@ export class ParticipationService {
           createdBy: BigInt(actorId),
         },
       });
+      // Guests carry no subscription: gated like a member without one. A fresh
+      // guest has no prior bookings, so only the time gate can block here.
+      await this.prime.assertAccess(tx, { guestId: guest.id }, role, event);
+      await this.prime.assertQuota(tx, { guestId: guest.id }, event, eventId);
       await tx.eventParticipant.create({
         data: { eventId, guestId: guest.id, addedByUserId: BigInt(actorId) },
       });
@@ -534,8 +551,8 @@ export class ParticipationService {
         return;
       }
       // The access gate and the weekly cap both gate joining the queue.
-      await this.prime.assertAccess(tx, actorId, role, event);
-      await this.prime.assertQuota(tx, actorId, event, eventId);
+      await this.prime.assertAccess(tx, { userId: actorId }, role, event);
+      await this.prime.assertQuota(tx, { userId: actorId }, event, eventId);
       const count = await tx.eventParticipant.count({ where: { eventId } });
       if (count < event.capacity) {
         // There is space — join directly instead of waiting.
@@ -610,9 +627,20 @@ export class ParticipationService {
       ids.push(Number(l.actorUserId));
       if (l.targetUserId != null) ids.push(Number(l.targetUserId));
     }
-    const [profiles, guestProfiles] = await Promise.all([
+    const participantUserIds = participants
+      .filter((p) => p.userId != null)
+      .map((p) => Number(p.userId));
+    const participantGuestIds = participants
+      .filter((p) => p.guestId != null)
+      .map((p) => p.guestId as string);
+    const [profiles, guestProfiles, primeCounts] = await Promise.all([
       this.users.getProfileMap(ids),
       this.guests.getMap(guestIds),
+      this.prime.countPrimeWeekForSubjects(
+        this.prisma,
+        { userIds: participantUserIds, guestIds: participantGuestIds },
+        event,
+      ),
     ]);
     const nameOf = (id: number): string =>
       profiles.get(id)?.name ?? 'Користувач';
@@ -664,6 +692,12 @@ export class ParticipationService {
           isSelf,
           canRemove: role === Role.admin || p.addedByUserId === actor || isSelf,
           joinedAt: p.joinedAt.toISOString(),
+          primeWeekCount:
+            p.userId != null
+              ? primeCounts.users.get(Number(p.userId)) ?? 0
+              : p.guestId != null
+                ? primeCounts.guests.get(p.guestId) ?? 0
+                : null,
         };
       }),
       waitlist: waitlist.map((w) => {

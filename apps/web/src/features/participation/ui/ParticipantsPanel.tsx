@@ -4,6 +4,7 @@ import { uk } from 'date-fns/locale';
 import {
   EVENT_TYPE,
   GENDER,
+  PRIME_TIME_MAX_PER_WEEK,
   type EventDto,
   type Gender,
   type ParticipationLogDto,
@@ -271,6 +272,18 @@ export function ParticipantsPanel({
                     </span>
                   )}
                 </span>
+                {p.primeWeekCount != null && (
+                  <span
+                    className={`participants__quota${
+                      p.primeWeekCount >= PRIME_TIME_MAX_PER_WEEK
+                        ? ' participants__quota--full'
+                        : ''
+                    }`}
+                    title="Записи у прайм-тайм цього тижня"
+                  >
+                    {p.primeWeekCount}/{PRIME_TIME_MAX_PER_WEEK}
+                  </span>
+                )}
                 {p.canRemove && !ended && (
                   <button
                     type="button"

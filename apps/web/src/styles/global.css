@@ -670,6 +670,24 @@ button {
 
 .participants__name {
   font-size: 15px;
+  flex: 1;
+  min-width: 0;
+}
+
+.participants__quota {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--secondary-bg);
+  color: var(--subtitle);
+}
+
+.participants__quota--full {
+  background: color-mix(in srgb, var(--destructive) 16%, transparent);
+  color: var(--destructive);
 }
 
 .participants__you {

@@ -112,8 +112,8 @@ export class EventsService {
         });
 
         if (joinSelf) {
-          await this.prime.assertAccess(tx, userId, role, created);
-          await this.prime.assertQuota(tx, userId, created);
+          await this.prime.assertAccess(tx, { userId }, role, created);
+          await this.prime.assertQuota(tx, { userId }, created);
           await tx.eventParticipant.create({
             data: {
               eventId: created.id,
