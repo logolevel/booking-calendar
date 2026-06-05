@@ -539,18 +539,19 @@ button {
 }
 
 /* Prime-time (weekly-quota) window: a gold outline only — no fill, since it
-   overlaps the subscription-prime band. Shown to every role for awareness. */
+   overlaps the subscription-prime band. Shown to every role for awareness.
+   !important defeats react-big-calendar's default (gray) slot borders. */
 .rbc-day-slot .rbc-time-slot.rbc-prime-quota {
-  border-left: 2px solid rgba(214, 158, 30, 0.85);
-  border-right: 2px solid rgba(214, 158, 30, 0.85);
+  border-left: 2px solid #e0a400 !important;
+  border-right: 2px solid #e0a400 !important;
 }
 
 .rbc-day-slot .rbc-time-slot.rbc-prime-quota-start {
-  border-top: 2px solid rgba(214, 158, 30, 0.85);
+  border-top: 2px solid #e0a400 !important;
 }
 
 .rbc-day-slot .rbc-time-slot.rbc-prime-quota-end {
-  border-bottom: 2px solid rgba(214, 158, 30, 0.85);
+  border-bottom: 2px solid #e0a400 !important;
 }
 
 .form__error {
