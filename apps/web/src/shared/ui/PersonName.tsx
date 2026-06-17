@@ -26,10 +26,18 @@ export function PersonName({
       : gender === GENDER.MALE
         ? ' person--male'
         : '';
-  // Plain (monochrome) snowflake for root; crown for other admins.
+  // Single badge by priority: root ❄️ > admin 👑 > active subscriber ⭐ > member 👤.
   // U+FE0E forces text (non-emoji) presentation of the snowflake.
-  const roleBadge = isRoot ? '\u2744\uFE0E' : isAdmin ? '👑' : isUser ? '👤' : '';
-  const badge = `${roleBadge}${isSubscriber ? '⭐' : ''}`;
+  let badge = '';
+  if (isRoot) {
+    badge = '\u2744\uFE0E';
+  } else if (isAdmin) {
+    badge = '👑';
+  } else if (isSubscriber) {
+    badge = '⭐';
+  } else if (isUser) {
+    badge = '👤';
+  }
 
   return (
     <span className={`person${genderClass}`}>
