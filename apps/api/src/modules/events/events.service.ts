@@ -16,6 +16,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { PrimeTimeService } from '../prime-time/prime-time.service';
+import { EventNotificationsService } from '../notifications/event-notifications.service';
 import type { CreateEventDto } from './dto/create-event.dto';
 
 type Db = Prisma.TransactionClient;
@@ -47,6 +48,7 @@ export class EventsService {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly prime: PrimeTimeService,
+    private readonly notifications: EventNotificationsService,
   ) {}
 
   async list(from: Date, to: Date): Promise<EventDto[]> {
@@ -180,6 +182,7 @@ export class EventsService {
         where: { id },
         data: { capacity: dto.capacity },
       });
+      await this.notifyChange(id, userId);
       return this.toDto(event, count);
     }
 
@@ -210,7 +213,24 @@ export class EventsService {
         });
       }),
     );
+    await this.notifyChange(id, userId);
     return this.toDto(event, await this.countParticipants(id));
+  }
+
+  // Tell everyone in the event (except the editor) that it was changed.
+  private async notifyChange(eventId: string, actorId: number): Promise<void> {
+    const actor = await this.notifications.userDisplay(actorId);
+    const label = await this.notifications.label(eventId);
+    const verb = EventNotificationsService.verb(
+      actor.gender,
+      'змінив',
+      'змінила',
+    );
+    await this.notifications.broadcast(
+      eventId,
+      `${actor.text} ${verb} подію: ${label}`,
+      [actorId],
+    );
   }
 
   private countParticipants(eventId: string): Promise<number> {
@@ -228,7 +248,24 @@ export class EventsService {
     if (role !== Role.admin && !isAuthor) {
       throw new ForbiddenException('Only the author or an admin can delete');
     }
+
+    // Capture recipients and label before the row (and its participants) vanish.
+    const audience = await this.notifications.audience(id);
+    const label = await this.notifications.label(id);
+    const actor = await this.notifications.userDisplay(userId);
+
     await this.prisma.event.delete({ where: { id } });
+
+    const verb = EventNotificationsService.verb(
+      actor.gender,
+      'скасував',
+      'скасувала',
+    );
+    await this.notifications.notify(
+      id,
+      audience.filter((uid) => uid !== userId),
+      `${actor.text} ${verb} подію ${label}`,
+    );
   }
 
   // A finished event is frozen: nobody (not even an admin) may edit or delete.

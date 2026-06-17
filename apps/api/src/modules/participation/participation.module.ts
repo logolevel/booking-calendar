@@ -4,7 +4,7 @@ import { UsersModule } from '../users/users.module';
 import { GuestsModule } from '../guests/guests.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { PrimeTimeModule } from '../prime-time/prime-time.module';
-import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { EventNotificationsModule } from '../notifications/event-notifications.module';
 import { EventsGateway } from '../realtime/events.gateway';
 import { ParticipationController } from './participation.controller';
 import { ParticipationService } from './participation.service';
@@ -16,7 +16,7 @@ import { ParticipationService } from './participation.service';
     GuestsModule,
     TelegramModule,
     PrimeTimeModule,
-    SubscriptionsModule,
+    EventNotificationsModule,
   ],
   controllers: [ParticipationController],
   providers: [ParticipationService, EventsGateway],

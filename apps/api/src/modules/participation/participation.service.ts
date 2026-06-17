@@ -17,7 +17,7 @@ import { UsersService } from '../users/users.service';
 import { GuestsService } from '../guests/guests.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrimeTimeService } from '../prime-time/prime-time.service';
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { EventNotificationsService } from '../notifications/event-notifications.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -39,42 +39,8 @@ export class ParticipationService {
     private readonly guests: GuestsService,
     private readonly telegram: TelegramService,
     private readonly prime: PrimeTimeService,
-    private readonly subscriptions: SubscriptionsService,
+    private readonly notifications: EventNotificationsService,
   ) {}
-
-  // Single status badge shown before a user's name in push notifications.
-  // One icon per person by priority: root ❄️ > admin 👑 > active subscriber ⭐ >
-  // plain member 👤.
-  private async statusBadge(userId: number, isAdmin: boolean): Promise<string> {
-    if (this.access.isRoot(userId)) {
-      return '\u2744\uFE0E';
-    }
-    if (isAdmin) {
-      return '👑';
-    }
-    if (await this.subscriptions.isActive(userId)) {
-      return '⭐';
-    }
-    return '👤';
-  }
-
-  // Human-readable event label for push notifications (court time zone).
-  private async eventLabel(eventId: string): Promise<string> {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
-    if (!event) {
-      return 'тренування';
-    }
-    const when = new Intl.DateTimeFormat('uk-UA', {
-      timeZone: 'Europe/Kyiv',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(event.startsAt);
-    const name = event.title ?? 'тренування';
-    const court = event.resourceId === 1 ? 'Зелений' : 'Червоний';
-    return `${name} (${when}, майданчик ${court})`;
-  }
 
   // Lock the event row for the duration of the transaction to avoid two
   // clients grabbing the last seat at the same time.
@@ -95,15 +61,6 @@ export class ParticipationService {
     if (endsAt.getTime() <= Date.now()) {
       throw new ForbiddenException('Event has already ended');
     }
-  }
-
-  // Pick the verb form by gender; fall back to masculine when unknown.
-  private static genderVerb(
-    gender: string | null,
-    male: string,
-    female: string,
-  ): string {
-    return gender === 'female' ? female : male;
   }
 
   // Member events disappear once the last participant leaves; admin events
@@ -238,6 +195,7 @@ export class ParticipationService {
   }
 
   async joinSelf(eventId: string, actorId: number, role: Role): Promise<void> {
+    let joined = false;
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
@@ -266,7 +224,23 @@ export class ParticipationService {
       await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.JOIN, {
         userId: actorId,
       });
+      joined = true;
     });
+
+    if (joined) {
+      const actor = await this.notifications.userDisplay(actorId);
+      const label = await this.notifications.label(eventId);
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'записався',
+        'записалася',
+      );
+      await this.notifications.broadcast(
+        eventId,
+        `${actor.text} ${verb} на ${label}`,
+        [actorId],
+      );
+    }
   }
 
   async addParticipant(
@@ -337,39 +311,34 @@ export class ParticipationService {
     });
 
     // Notifications only after a successful commit.
-    const profiles = await this.users.getProfileMap([actorId, targetUserId]);
-    const label = await this.eventLabel(eventId);
+    const label = await this.notifications.label(eventId);
     const link = await this.telegram.eventDeepLink(eventId);
-    const actorProfile = profiles.get(actorId);
-    const targetProfile = profiles.get(targetUserId);
-    const actorBadge = await this.statusBadge(
-      actorId,
-      actorProfile?.isAdmin ?? false,
-    );
-    const actorName = `${actorBadge} ${actorProfile?.name ?? 'Учасник'}`;
-    const added = ParticipationService.genderVerb(
-      actorProfile?.gender ?? null,
+    const actor = await this.notifications.userDisplay(actorId);
+    const target = await this.notifications.userDisplay(targetUserId);
+    const added = EventNotificationsService.verb(
+      actor.gender,
       'додав',
       'додала',
     );
     await this.telegram.notifyUser(
       targetUserId,
-      `Вас ${added} ${actorName} на ${label}`,
+      `Вас ${added} ${actor.text} на ${label}`,
       link,
     );
     // Skip the admin copy when the added person is the admin recipient: they
     // already got the "you were added" message above.
     if (role !== Role.admin && !this.access.isRoot(targetUserId)) {
-      const targetBadge = await this.statusBadge(
-        targetUserId,
-        targetProfile?.isAdmin ?? false,
-      );
-      const targetName = `${targetBadge} ${targetProfile?.name ?? 'учасника'}`;
       await this.telegram.notifyAdmin(
-        `${actorName} ${added} ${targetName} на ${label}`,
+        `${actor.text} ${added} ${target.text} на ${label}`,
         link,
       );
     }
+    // Everyone else in the event learns about the new participant.
+    await this.notifications.broadcast(
+      eventId,
+      `${actor.text} ${added} ${target.text} на ${label}`,
+      [actorId, targetUserId],
+    );
   }
 
   // Shared "+1" rule: non-admins must already be in and may add one extra
@@ -411,6 +380,7 @@ export class ParticipationService {
     role: Role,
     guestId: string,
   ): Promise<void> {
+    let guestName = 'гостя';
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
@@ -431,10 +401,13 @@ export class ParticipationService {
       await tx.eventParticipant.create({
         data: { eventId, guestId, addedByUserId: BigInt(actorId) },
       });
+      guestName = this.guests.displayName(guest);
       await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.ADD, {
-        guestName: this.guests.displayName(guest),
+        guestName,
       });
     });
+
+    await this.broadcastGuestAdded(eventId, actorId, guestName);
   }
 
   async createAndAddGuest(
@@ -443,6 +416,7 @@ export class ParticipationService {
     role: Role,
     input: { firstName: string; lastName: string; gender: Prisma.GuestCreateInput['gender'] },
   ): Promise<void> {
+    let guestName = 'гостя';
     await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
@@ -462,10 +436,29 @@ export class ParticipationService {
       await tx.eventParticipant.create({
         data: { eventId, guestId: guest.id, addedByUserId: BigInt(actorId) },
       });
+      guestName = this.guests.displayName(guest);
       await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.ADD, {
-        guestName: this.guests.displayName(guest),
+        guestName,
       });
     });
+
+    await this.broadcastGuestAdded(eventId, actorId, guestName);
+  }
+
+  // A guest has no bot chat, so only the rest of the event is notified.
+  private async broadcastGuestAdded(
+    eventId: string,
+    actorId: number,
+    guestName: string,
+  ): Promise<void> {
+    const actor = await this.notifications.userDisplay(actorId);
+    const label = await this.notifications.label(eventId);
+    const verb = EventNotificationsService.verb(actor.gender, 'додав', 'додала');
+    await this.notifications.broadcast(
+      eventId,
+      `${actor.text} ${verb} гостя ${guestName} на ${label}`,
+      [actorId],
+    );
   }
 
   async removeParticipant(
@@ -514,13 +507,89 @@ export class ParticipationService {
         await this.reassignAuthor(tx, eventId);
       }
       const deleted = await this.deleteIfEmpty(tx, eventId, event.allowEmpty);
-      return { promoted, deleted };
+      return {
+        promoted,
+        deleted,
+        isSelf,
+        removedUserId:
+          participant.userId != null ? Number(participant.userId) : null,
+        guestName: guest ? this.guests.displayName(guest) : null,
+      };
     });
 
     if (!result.deleted) {
       await this.notifyPromoted(eventId, result.promoted);
     }
+    await this.notifyRemoval(eventId, actorId, result);
     return result.deleted;
+  }
+
+  // Tell the removed person (if a registered user) and the rest of the event.
+  // Self-removal reads as "left"; removing someone else reads as "removed".
+  private async notifyRemoval(
+    eventId: string,
+    actorId: number,
+    result: {
+      promoted: number | null;
+      deleted: boolean;
+      isSelf: boolean;
+      removedUserId: number | null;
+      guestName: string | null;
+    },
+  ): Promise<void> {
+    const actor = await this.notifications.userDisplay(actorId);
+    const label = await this.notifications.label(eventId);
+    const exclude = [actorId];
+    if (result.promoted != null) {
+      exclude.push(result.promoted);
+    }
+
+    if (result.isSelf) {
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'вийшов',
+        'вийшла',
+      );
+      await this.notifications.broadcast(
+        eventId,
+        `${actor.text} ${verb} з ${label}`,
+        exclude,
+      );
+      return;
+    }
+
+    const verb = EventNotificationsService.verb(
+      actor.gender,
+      'видалив',
+      'видалила',
+    );
+    if (result.guestName) {
+      await this.notifications.broadcast(
+        eventId,
+        `${actor.text} ${verb} гостя ${result.guestName} з ${label}`,
+        exclude,
+      );
+      return;
+    }
+
+    const removedId = result.removedUserId;
+    if (removedId != null) {
+      await this.notifications.notify(
+        eventId,
+        [removedId],
+        `Вас ${verb} ${actor.text} з ${label}`,
+      );
+      exclude.push(removedId);
+    }
+    const removed =
+      removedId != null
+        ? (await this.notifications.userDisplay(removedId)).text
+        : 'учасника';
+    await this.notifications.broadcast(
+      eventId,
+      `${actor.text} ${verb} ${removed} з ${label}`,
+      exclude,
+    );
   }
 
   async leaveSelf(eventId: string, actorId: number): Promise<boolean> {
@@ -541,17 +610,54 @@ export class ParticipationService {
           await this.reassignAuthor(tx, eventId);
         }
         const deleted = await this.deleteIfEmpty(tx, eventId, event.allowEmpty);
-        return { promoted, deleted };
+        return { promoted, deleted, outcome: 'left' as const };
       }
-      await tx.eventWaitlist.deleteMany({
+      const removed = await tx.eventWaitlist.deleteMany({
         where: { eventId, userId: BigInt(actorId) },
       });
-      return { promoted: null, deleted: false };
+      return {
+        promoted: null,
+        deleted: false,
+        outcome: removed.count > 0 ? ('leftQueue' as const) : ('noop' as const),
+      };
     });
 
     if (!result.deleted) {
       await this.notifyPromoted(eventId, result.promoted);
     }
+
+    if (result.outcome === 'left' && !result.deleted) {
+      const actor = await this.notifications.userDisplay(actorId);
+      const label = await this.notifications.label(eventId);
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'вийшов',
+        'вийшла',
+      );
+      const exclude = [actorId];
+      if (result.promoted != null) {
+        exclude.push(result.promoted);
+      }
+      await this.notifications.broadcast(
+        eventId,
+        `${actor.text} ${verb} з ${label}`,
+        exclude,
+      );
+    } else if (result.outcome === 'leftQueue') {
+      const actor = await this.notifications.userDisplay(actorId);
+      const label = await this.notifications.label(eventId);
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'вийшов',
+        'вийшла',
+      );
+      await this.notifications.broadcast(
+        eventId,
+        `${actor.text} ${verb} з черги на ${label}`,
+        [actorId],
+      );
+    }
+
     return result.deleted;
   }
 
@@ -562,12 +668,11 @@ export class ParticipationService {
     if (promotedUserId == null) {
       return;
     }
-    const label = await this.eventLabel(eventId);
-    const link = await this.telegram.eventDeepLink(eventId);
-    await this.telegram.notifyUser(
-      promotedUserId,
+    const label = await this.notifications.label(eventId);
+    await this.notifications.notify(
+      eventId,
+      [promotedUserId],
       `Ви з черги потрапили на ${label}`,
-      link,
     );
   }
 
@@ -576,14 +681,14 @@ export class ParticipationService {
     actorId: number,
     role: Role,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
       const existing = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
       if (existing) {
-        return;
+        return 'noop' as const;
       }
       // The access gate and the weekly cap both gate joining the queue.
       await this.prime.assertAccess(tx, { userId: actorId }, role, event);
@@ -601,14 +706,34 @@ export class ParticipationService {
         await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.JOIN, {
           userId: actorId,
         });
-        return;
+        return 'joined' as const;
       }
       await tx.eventWaitlist.upsert({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
         create: { eventId, userId: BigInt(actorId) },
         update: {},
       });
+      return 'queued' as const;
     });
+
+    if (outcome === 'noop') {
+      return;
+    }
+    const actor = await this.notifications.userDisplay(actorId);
+    const label = await this.notifications.label(eventId);
+    const text =
+      outcome === 'joined'
+        ? `${actor.text} ${EventNotificationsService.verb(
+            actor.gender,
+            'записався',
+            'записалася',
+          )} на ${label}`
+        : `${actor.text} ${EventNotificationsService.verb(
+            actor.gender,
+            'став',
+            'стала',
+          )} у чергу на ${label}`;
+    await this.notifications.broadcast(eventId, text, [actorId]);
   }
 
   async leaveWaitlist(eventId: string, actorId: number): Promise<void> {
@@ -619,9 +744,24 @@ export class ParticipationService {
     if (event) {
       this.assertActive(event.endsAt);
     }
-    await this.prisma.eventWaitlist.deleteMany({
+    const removed = await this.prisma.eventWaitlist.deleteMany({
       where: { eventId, userId: BigInt(actorId) },
     });
+
+    if (removed.count > 0) {
+      const actor = await this.notifications.userDisplay(actorId);
+      const label = await this.notifications.label(eventId);
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'вийшов',
+        'вийшла',
+      );
+      await this.notifications.broadcast(
+        eventId,
+        `${actor.text} ${verb} з черги на ${label}`,
+        [actorId],
+      );
+    }
   }
 
   async getDetails(
