@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type {
   DirectoryGuestDto,
   DirectoryUserDto,
@@ -6,12 +6,19 @@ import type {
 import { Sheet } from '../../../shared/ui/Sheet';
 import { PersonName } from '../../../shared/ui/PersonName';
 import { useDirectory } from '../useDirectory';
+import { EditUserSheet } from './EditUserSheet';
 
 interface Props {
   onClose: () => void;
 }
 
-function UserRow({ user }: { user: DirectoryUserDto }): JSX.Element {
+function UserRow({
+  user,
+  onEdit,
+}: {
+  user: DirectoryUserDto;
+  onEdit?: (user: DirectoryUserDto) => void;
+}): JSX.Element {
   return (
     <li className="participants__item">
       <span className="participants__name">
@@ -27,6 +34,16 @@ function UserRow({ user }: { user: DirectoryUserDto }): JSX.Element {
           <span className="participants__by"> @{user.username}</span>
         )}
       </span>
+      {/* The root admin is never editable. */}
+      {onEdit && !user.isRoot && (
+        <button
+          type="button"
+          className="directory__edit"
+          onClick={() => onEdit(user)}
+        >
+          Редагувати
+        </button>
+      )}
     </li>
   );
 }
@@ -72,6 +89,7 @@ function Section({
 
 export function UsersSheet({ onClose }: Props): JSX.Element {
   const { data, isLoading, isError } = useDirectory(true);
+  const [editing, setEditing] = useState<DirectoryUserDto | null>(null);
 
   return (
     <Sheet title="Користувачі" onClose={onClose}>
@@ -84,21 +102,35 @@ export function UsersSheet({ onClose }: Props): JSX.Element {
             Усього: <strong>{data.total}</strong>
           </p>
 
-          <Section title="Адміністратори" count={data.admins.length}>
-            {data.admins.map((u) => (
-              <UserRow key={u.userId} user={u} />
-            ))}
-          </Section>
+          {(() => {
+            const roots = data.admins.filter((u) => u.isRoot);
+            const admins = data.admins.filter((u) => !u.isRoot);
+            return (
+              <>
+                <Section title="Root" count={roots.length}>
+                  {roots.map((u) => (
+                    <UserRow key={u.userId} user={u} />
+                  ))}
+                </Section>
+
+                <Section title="Адміністратори" count={admins.length}>
+                  {admins.map((u) => (
+                    <UserRow key={u.userId} user={u} onEdit={setEditing} />
+                  ))}
+                </Section>
+              </>
+            );
+          })()}
 
           <Section title="Власники абонементів" count={data.subscribers.length}>
             {data.subscribers.map((u) => (
-              <UserRow key={u.userId} user={u} />
+              <UserRow key={u.userId} user={u} onEdit={setEditing} />
             ))}
           </Section>
 
           <Section title="Учасники" count={data.members.length}>
             {data.members.map((u) => (
-              <UserRow key={u.userId} user={u} />
+              <UserRow key={u.userId} user={u} onEdit={setEditing} />
             ))}
           </Section>
 
@@ -108,6 +140,10 @@ export function UsersSheet({ onClose }: Props): JSX.Element {
             ))}
           </Section>
         </>
+      )}
+
+      {editing && (
+        <EditUserSheet user={editing} onClose={() => setEditing(null)} />
       )}
     </Sheet>
   );

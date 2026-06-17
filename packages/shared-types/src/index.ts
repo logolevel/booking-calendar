@@ -354,12 +354,22 @@ export interface CreateSubscriptionRequest {
 export interface DirectoryUserDto {
   userId: number;
   name: string;
+  // Raw profile parts, so an admin can prefill the edit form.
+  firstName: string;
+  lastName: string | null;
   username: string | null;
   gender: Gender | null;
   isRoot: boolean;
   isAdmin: boolean;
   // Has an active subscription right now.
   isSubscriber: boolean;
+}
+
+// Admin-only edit of another user's profile (fixing incorrect onboarding data).
+export interface UpdateUserProfileRequest {
+  firstName: string;
+  lastName: string;
+  gender: Gender;
 }
 
 export interface DirectoryGuestDto {

@@ -54,7 +54,14 @@ export class UsersService {
   async listByIds(
     ids: number[],
   ): Promise<
-    { userId: number; name: string; username: string | null; gender: Gender | null }[]
+    {
+      userId: number;
+      name: string;
+      firstName: string | null;
+      lastName: string | null;
+      username: string | null;
+      gender: Gender | null;
+    }[]
   > {
     if (ids.length === 0) {
       return [];
@@ -69,10 +76,19 @@ export class UsersService {
         ? {
             userId: id,
             name: this.displayName(u),
+            firstName: u.firstName,
+            lastName: u.lastName,
             username: u.username ?? null,
             gender: u.gender,
           }
-        : { userId: id, name: 'Користувач', username: null, gender: null };
+        : {
+            userId: id,
+            name: 'Користувач',
+            firstName: null,
+            lastName: null,
+            username: null,
+            gender: null,
+          };
     });
   }
 

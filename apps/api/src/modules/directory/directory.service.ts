@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type {
   DirectoryUserDto,
+  UpdateUserProfileRequest,
   UsersDirectoryResponse,
 } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -45,6 +46,8 @@ export class DirectoryService {
     const admins: DirectoryUserDto[] = adminRows.map((r) => ({
       userId: r.userId,
       name: r.name,
+      firstName: r.firstName ?? '',
+      lastName: r.lastName,
       username: r.username,
       gender: r.gender,
       isRoot: this.access.isRoot(r.userId),
@@ -62,6 +65,8 @@ export class DirectoryService {
       const dto: DirectoryUserDto = {
         userId: id,
         name: this.users.displayName(u),
+        firstName: u.firstName,
+        lastName: u.lastName,
         username: u.username ?? null,
         gender: u.gender,
         isRoot: false,
@@ -85,5 +90,27 @@ export class DirectoryService {
       members,
       guests,
     };
+  }
+
+  // Admin-only fix of another user's profile. The caller (controller) enforces
+  // the admin role and blocks editing the root admin.
+  async updateUser(
+    targetId: number,
+    dto: UpdateUserProfileRequest,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: BigInt(targetId) },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    await this.prisma.user.update({
+      where: { id: BigInt(targetId) },
+      data: {
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        gender: dto.gender,
+      },
+    });
   }
 }
