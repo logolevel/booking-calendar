@@ -42,17 +42,20 @@ export class ParticipationService {
     private readonly subscriptions: SubscriptionsService,
   ) {}
 
-  // Status badge shown before a user's name in push notifications, matching the
-  // Mini App convention: root ❄️, other admins 👑, plain members 👤; an active
-  // subscriber adds ⭐ (badges combine, e.g. 👑⭐).
+  // Single status badge shown before a user's name in push notifications.
+  // One icon per person by priority: root ❄️ > admin 👑 > active subscriber ⭐ >
+  // plain member 👤.
   private async statusBadge(userId: number, isAdmin: boolean): Promise<string> {
-    const role = this.access.isRoot(userId)
-      ? '\u2744\uFE0E'
-      : isAdmin
-        ? '👑'
-        : '👤';
-    const star = (await this.subscriptions.isActive(userId)) ? '⭐' : '';
-    return `${role}${star}`;
+    if (this.access.isRoot(userId)) {
+      return '\u2744\uFE0E';
+    }
+    if (isAdmin) {
+      return '👑';
+    }
+    if (await this.subscriptions.isActive(userId)) {
+      return '⭐';
+    }
+    return '👤';
   }
 
   // Human-readable event label for push notifications (court time zone).
@@ -354,7 +357,9 @@ export class ParticipationService {
       `Вас ${added} ${actorName} на ${label}`,
       link,
     );
-    if (role !== Role.admin) {
+    // Skip the admin copy when the added person is the admin recipient: they
+    // already got the "you were added" message above.
+    if (role !== Role.admin && !this.access.isRoot(targetUserId)) {
       const targetBadge = await this.statusBadge(
         targetUserId,
         targetProfile?.isAdmin ?? false,
