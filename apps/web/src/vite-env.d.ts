@@ -23,6 +23,10 @@ interface TelegramWebApp {
   colorScheme: 'light' | 'dark';
   themeParams: TelegramThemeParams;
   initData: string;
+  initDataUnsafe?: {
+    start_param?: string;
+    [key: string]: unknown;
+  };
   setHeaderColor: (color: string) => void;
   setBackgroundColor: (color: string) => void;
   onEvent: (eventType: string, handler: () => void) => void;

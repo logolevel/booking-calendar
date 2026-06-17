@@ -17,6 +17,7 @@ import { UsersService } from '../users/users.service';
 import { GuestsService } from '../guests/guests.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrimeTimeService } from '../prime-time/prime-time.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -38,7 +39,21 @@ export class ParticipationService {
     private readonly guests: GuestsService,
     private readonly telegram: TelegramService,
     private readonly prime: PrimeTimeService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
+
+  // Status badge shown before a user's name in push notifications, matching the
+  // Mini App convention: root ❄️, other admins 👑, plain members 👤; an active
+  // subscriber adds ⭐ (badges combine, e.g. 👑⭐).
+  private async statusBadge(userId: number, isAdmin: boolean): Promise<string> {
+    const role = this.access.isRoot(userId)
+      ? '\u2744\uFE0E'
+      : isAdmin
+        ? '👑'
+        : '👤';
+    const star = (await this.subscriptions.isActive(userId)) ? '⭐' : '';
+    return `${role}${star}`;
+  }
 
   // Human-readable event label for push notifications (court time zone).
   private async eventLabel(eventId: string): Promise<string> {
@@ -321,20 +336,33 @@ export class ParticipationService {
     // Notifications only after a successful commit.
     const profiles = await this.users.getProfileMap([actorId, targetUserId]);
     const label = await this.eventLabel(eventId);
-    const actorName = profiles.get(actorId)?.name ?? 'Учасник';
+    const link = await this.telegram.eventDeepLink(eventId);
+    const actorProfile = profiles.get(actorId);
+    const targetProfile = profiles.get(targetUserId);
+    const actorBadge = await this.statusBadge(
+      actorId,
+      actorProfile?.isAdmin ?? false,
+    );
+    const actorName = `${actorBadge} ${actorProfile?.name ?? 'Учасник'}`;
     const added = ParticipationService.genderVerb(
-      profiles.get(actorId)?.gender ?? null,
+      actorProfile?.gender ?? null,
       'додав',
       'додала',
     );
     await this.telegram.notifyUser(
       targetUserId,
       `Вас ${added} ${actorName} на ${label}`,
+      link,
     );
     if (role !== Role.admin) {
-      const targetName = profiles.get(targetUserId)?.name ?? 'учасника';
+      const targetBadge = await this.statusBadge(
+        targetUserId,
+        targetProfile?.isAdmin ?? false,
+      );
+      const targetName = `${targetBadge} ${targetProfile?.name ?? 'учасника'}`;
       await this.telegram.notifyAdmin(
         `${actorName} ${added} ${targetName} на ${label}`,
+        link,
       );
     }
   }
@@ -530,9 +558,11 @@ export class ParticipationService {
       return;
     }
     const label = await this.eventLabel(eventId);
+    const link = await this.telegram.eventDeepLink(eventId);
     await this.telegram.notifyUser(
       promotedUserId,
       `Ви з черги потрапили на ${label}`,
+      link,
     );
   }
 

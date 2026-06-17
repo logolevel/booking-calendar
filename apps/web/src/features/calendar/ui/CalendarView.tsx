@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -149,6 +150,8 @@ interface Props {
   subPrimeEnd: string;
   primeMemberOpenHour: number;
   isSubscriber: boolean;
+  // Event id from a Telegram deep link; opens its roster on first load.
+  initialEventId?: string | null;
 }
 
 export function CalendarView({
@@ -161,6 +164,7 @@ export function CalendarView({
   subPrimeEnd,
   primeMemberOpenHour,
   isSubscriber,
+  initialEventId,
 }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
   const [view, setView] = useState<View>(getDefaultView);
@@ -268,6 +272,24 @@ export function CalendarView({
     setMode('details');
     setFormOpen(true);
   };
+
+  // When opened via an event deep link, jump to that event's date and show its
+  // roster once the events have loaded. Runs at most once per launch.
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandled.current || !initialEventId || !data) {
+      return;
+    }
+    const target = data.find((e) => e.id === initialEventId);
+    if (!target) {
+      return;
+    }
+    deepLinkHandled.current = true;
+    setDate(new Date(target.startsAt));
+    setActiveEvent(target);
+    setMode('details');
+    setFormOpen(true);
+  }, [initialEventId, data]);
 
   // Tap (or drag) on an empty slot to start creating an event there.
   const onSelectSlot = (slot: SlotInfo): void => {

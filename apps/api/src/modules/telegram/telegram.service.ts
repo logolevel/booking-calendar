@@ -238,6 +238,23 @@ export class TelegramService {
     return username ? `https://t.me/${username}?startapp` : null;
   }
 
+  // Mini App deep link that opens a specific event (the web app reads the
+  // `startapp` payload and shows that event's roster on launch).
+  async eventDeepLink(eventId: string): Promise<string | null> {
+    const base = await this.getMiniAppDeepLink();
+    return base
+      ? TelegramService.withStartAppParam(base, `event_${eventId}`)
+      : null;
+  }
+
+  // Set/override the `startapp` query param on a t.me deep link.
+  private static withStartAppParam(link: string, value: string): string {
+    const [path, query = ''] = link.split('?');
+    const params = new URLSearchParams(query);
+    params.set('startapp', value);
+    return `${path}?${params.toString()}`;
+  }
+
   private async getBotUsername(): Promise<string | null> {
     if (this.cachedUsername) {
       return this.cachedUsername;
@@ -253,18 +270,46 @@ export class TelegramService {
   }
 
   // Best-effort private message to a user (works only if they started the bot).
-  async notifyUser(userId: number, text: string): Promise<void> {
-    await this.sendMessage(userId, text);
+  // An optional deep link is rendered as an inline "open event" button.
+  async notifyUser(
+    userId: number,
+    text: string,
+    link?: string | null,
+  ): Promise<void> {
+    await this.sendMessage(userId, text, link);
   }
 
-  async notifyAdmin(text: string): Promise<void> {
+  async notifyAdmin(text: string, link?: string | null): Promise<void> {
     const adminId = Number(this.config.get<string>('ADMIN_ID'));
     if (Number.isFinite(adminId)) {
-      await this.sendMessage(adminId, text);
+      await this.sendMessage(adminId, text, link);
     }
   }
 
-  private async sendMessage(chatId: number, text: string): Promise<void> {
+  private async sendMessage(
+    chatId: number,
+    text: string,
+    link?: string | null,
+  ): Promise<void> {
+    if (link) {
+      // Inline hyperlink keeps the chat tidy (no button blocks under messages).
+      const body = `${TelegramService.escapeHtml(
+        text,
+      )}\n\n🔗 <a href="${TelegramService.escapeHtml(link)}">Відкрити подію</a>`;
+      await this.callApi('sendMessage', {
+        chat_id: chatId,
+        text: body,
+        parse_mode: 'HTML',
+      });
+      return;
+    }
     await this.callApi('sendMessage', { chat_id: chatId, text });
+  }
+
+  private static escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 }
