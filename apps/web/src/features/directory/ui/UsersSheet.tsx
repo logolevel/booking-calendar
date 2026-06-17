@@ -38,10 +38,11 @@ function UserRow({
       {onEdit && !user.isRoot && (
         <button
           type="button"
-          className="directory__edit"
+          className="icon-btn"
+          aria-label="Редагувати"
           onClick={() => onEdit(user)}
         >
-          Редагувати
+          ✏️
         </button>
       )}
     </li>
