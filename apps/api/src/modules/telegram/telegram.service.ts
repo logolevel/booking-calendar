@@ -300,6 +300,7 @@ export class TelegramService {
         chat_id: chatId,
         text: body,
         parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
       });
       return;
     }
