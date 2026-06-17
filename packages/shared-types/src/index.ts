@@ -230,6 +230,8 @@ export const PARTICIPATION_ACTION = {
   LEAVE: 'leave',
   REMOVE: 'remove',
   PROMOTED: 'promoted',
+  // Event fields were edited; details are carried in the log's target field.
+  EDITED: 'edited',
 } as const;
 
 export type ParticipationAction =

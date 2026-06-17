@@ -53,6 +53,10 @@ function logText(entry: ParticipationLogDto): string {
       }`.trim();
     case 'promoted':
       return `${entry.targetName ?? entry.actorName} — з черги`;
+    case 'edited':
+      return `${entry.actorName} ${genderVerb(g, 'змінив', 'змінила')} подію${
+        entry.targetName ? `: ${entry.targetName}` : ''
+      }`;
     default:
       return entry.action;
   }

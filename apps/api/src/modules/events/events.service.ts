@@ -28,6 +28,32 @@ const OVERLAP_CONSTRAINT = 'Event_no_overlap';
 const EXCLUSION_VIOLATION_SQLSTATE = '23P01';
 const OVERLAP_MESSAGE = 'This court is already booked for the selected time';
 
+// UA labels for change notifications (until i18n is wired on the backend).
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  women: 'Жінки',
+  men: 'Чоловіки',
+  mixed: 'Мікс',
+  individual: 'Індивідуальне',
+  tech_women: 'Техніка (жінки)',
+  tech_men: 'Техніка (чоловіки)',
+  group: 'Група',
+};
+
+const COURT_LABELS: Record<number, string> = { 1: 'Зелений', 2: 'Червоний' };
+
+// Fields compared to describe what changed in an event edit.
+interface EventComparable {
+  type: string;
+  resourceId: number;
+  title: string | null;
+  capacity: number;
+  organizerName: string | null;
+  organizerPhone: string | null;
+  groupSize: number | null;
+  startsAt: Date;
+  endsAt: Date;
+}
+
 interface EventRow {
   id: string;
   type: string;
@@ -182,7 +208,12 @@ export class EventsService {
         where: { id },
         data: { capacity: dto.capacity },
       });
-      await this.notifyChange(id, userId);
+      const changes = this.describeChanges(existing, {
+        ...existing,
+        capacity: dto.capacity,
+      });
+      await this.recordEdit(id, userId, changes);
+      await this.notifyChange(id, userId, changes);
       return this.toDto(event, count);
     }
 
@@ -193,6 +224,17 @@ export class EventsService {
     }
 
     const isGroup = dto.type === EVENT_TYPE.GROUP;
+    const next: EventComparable = {
+      type: dto.type,
+      resourceId: dto.resourceId,
+      title: dto.title ?? null,
+      capacity: dto.capacity,
+      organizerName: isGroup ? dto.organizerName ?? null : null,
+      organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+      groupSize: isGroup ? dto.groupSize ?? null : null,
+      startsAt,
+      endsAt,
+    };
 
     const event = await this.runGuardingOverlap(() =>
       this.prisma.$transaction(async (tx) => {
@@ -202,23 +244,129 @@ export class EventsService {
           data: {
             type: dto.type,
             resourceId: dto.resourceId,
-            title: dto.title ?? null,
-            capacity: dto.capacity,
-            organizerName: isGroup ? dto.organizerName ?? null : null,
-            organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
-            groupSize: isGroup ? dto.groupSize ?? null : null,
+            title: next.title,
+            capacity: next.capacity,
+            organizerName: next.organizerName,
+            organizerPhone: next.organizerPhone,
+            groupSize: next.groupSize,
             startsAt,
             endsAt,
           },
         });
       }),
     );
-    await this.notifyChange(id, userId);
+    const changes = this.describeChanges(existing, next);
+    await this.recordEdit(id, userId, changes);
+    await this.notifyChange(id, userId, changes);
     return this.toDto(event, await this.countParticipants(id));
   }
 
-  // Tell everyone in the event (except the editor) that it was changed.
-  private async notifyChange(eventId: string, actorId: number): Promise<void> {
+  // Build a human-readable list of what changed between two event states.
+  private describeChanges(
+    before: EventComparable,
+    after: EventComparable,
+  ): string[] {
+    const changes: string[] = [];
+    if (before.type !== after.type) {
+      changes.push(
+        `тип: ${EVENT_TYPE_LABELS[before.type] ?? before.type} → ${
+          EVENT_TYPE_LABELS[after.type] ?? after.type
+        }`,
+      );
+    }
+    if (before.resourceId !== after.resourceId) {
+      changes.push(
+        `майданчик: ${COURT_LABELS[before.resourceId] ?? before.resourceId} → ${
+          COURT_LABELS[after.resourceId] ?? after.resourceId
+        }`,
+      );
+    }
+    if (before.capacity !== after.capacity) {
+      changes.push(`ліміт учасників: ${before.capacity} → ${after.capacity}`);
+    }
+    if ((before.title ?? '') !== (after.title ?? '')) {
+      changes.push(
+        `назва: «${before.title ?? '—'}» → «${after.title ?? '—'}»`,
+      );
+    }
+    if (
+      before.startsAt.getTime() !== after.startsAt.getTime() ||
+      before.endsAt.getTime() !== after.endsAt.getTime()
+    ) {
+      changes.push(
+        `час: ${EventsService.fmtDateTime(before.startsAt)}–${EventsService.fmtTime(
+          before.endsAt,
+        )} → ${EventsService.fmtDateTime(after.startsAt)}–${EventsService.fmtTime(
+          after.endsAt,
+        )}`,
+      );
+    }
+    if ((before.organizerName ?? '') !== (after.organizerName ?? '')) {
+      changes.push(
+        `організатор: ${before.organizerName ?? '—'} → ${after.organizerName ?? '—'}`,
+      );
+    }
+    if ((before.organizerPhone ?? '') !== (after.organizerPhone ?? '')) {
+      changes.push(
+        `телефон: ${before.organizerPhone ?? '—'} → ${after.organizerPhone ?? '—'}`,
+      );
+    }
+    if ((before.groupSize ?? null) !== (after.groupSize ?? null)) {
+      changes.push(
+        `кількість: ${before.groupSize ?? '—'} → ${after.groupSize ?? '—'}`,
+      );
+    }
+    return changes;
+  }
+
+  private static fmtDateTime(date: Date): string {
+    return new Intl.DateTimeFormat('uk-UA', {
+      timeZone: 'Europe/Kyiv',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  }
+
+  private static fmtTime(date: Date): string {
+    return new Intl.DateTimeFormat('uk-UA', {
+      timeZone: 'Europe/Kyiv',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  }
+
+  // Append an edit entry to the event's history (same log as join/leave/
+  // add/remove). The change details live in the log's target field.
+  private async recordEdit(
+    eventId: string,
+    actorId: number,
+    changes: string[],
+  ): Promise<void> {
+    if (changes.length === 0) {
+      return;
+    }
+    await this.prisma.eventParticipationLog.create({
+      data: {
+        eventId,
+        actorUserId: BigInt(actorId),
+        action: PARTICIPATION_ACTION.EDITED,
+        targetGuestName: changes.join('; '),
+      },
+    });
+  }
+
+  // Tell everyone in the event (except the editor) what exactly changed.
+  // Nothing actually changed → no notification (avoids empty noise).
+  private async notifyChange(
+    eventId: string,
+    actorId: number,
+    changes: string[],
+  ): Promise<void> {
+    if (changes.length === 0) {
+      return;
+    }
     const actor = await this.notifications.userDisplay(actorId);
     const label = await this.notifications.label(eventId);
     const verb = EventNotificationsService.verb(
@@ -226,9 +374,10 @@ export class EventsService {
       'змінив',
       'змінила',
     );
+    const details = changes.map((c) => `• ${c}`).join('\n');
     await this.notifications.broadcast(
       eventId,
-      `${actor.text} ${verb} подію: ${label}`,
+      `${actor.text} ${verb} подію ${label}:\n${details}`,
       [actorId],
     );
   }
