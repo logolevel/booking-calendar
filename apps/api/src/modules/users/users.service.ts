@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Role, type Gender, type User } from '@prisma/client';
+import { type Gender, type User } from '@prisma/client';
 import type { UserSearchResult } from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -103,9 +103,13 @@ export class UsersService {
     const map = new Map<number, UserProfile>();
     for (const u of users) {
       map.set(Number(u.id), {
+        // The isAdmin flag is the source of truth (root is shown separately via
+        // isRoot). The role column only catches up when the user re-opens the
+        // app, so relying on it made freshly-granted admins show as regular
+        // users (and freshly-revoked ones keep the crown).
         name: this.displayName(u),
         gender: u.gender,
-        isAdmin: u.role === Role.admin,
+        isAdmin: u.isAdmin,
       });
     }
     return map;

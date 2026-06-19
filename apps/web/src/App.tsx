@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { PREVIEW_MODE, ROLE, type PreviewMode } from '@tg-calendar/shared-types';
 import { useMe } from './features/auth/useMe';
 import { usePreviewRole } from './features/auth/usePreviewRole';
-import { RoleSwitch } from './features/auth/ui/RoleSwitch';
 import { ApiError } from './shared/api/client';
 import { CalendarView } from './features/calendar/ui/CalendarView';
 import { OnboardingForm } from './features/onboarding/ui/OnboardingForm';
 import { SettingsSheet } from './features/admin/ui/SettingsSheet';
 import { AdminsSheet } from './features/admin/ui/AdminsSheet';
+import { AdminMenuSheet } from './features/admin/ui/AdminMenuSheet';
 import { SubscriptionsSheet } from './features/subscriptions/ui/SubscriptionsSheet';
 import { UsersSheet } from './features/directory/ui/UsersSheet';
 import { getStartEventId } from './shared/telegram/startParam';
@@ -44,6 +44,7 @@ function StateScreen({
 export function App(): JSX.Element {
   const { data: me, isLoading, error } = useMe();
   const { preview, setPreview } = usePreviewRole();
+  const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminsOpen, setAdminsOpen] = useState(false);
   const [subsOpen, setSubsOpen] = useState(false);
@@ -92,54 +93,37 @@ export function App(): JSX.Element {
         <span className="app__title">Календар</span>
         {me.isAdmin ? (
           <div className="app__header-actions">
-            {me.role === ROLE.ADMIN && (
-              <>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="Користувачі"
-                  onClick={() => setUsersOpen(true)}
-                >
-                  👥
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="Абонементи"
-                  onClick={() => setSubsOpen(true)}
-                >
-                  ⭐
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="Адміністратори"
-                  onClick={() => setAdminsOpen(true)}
-                >
-                  👑
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="Налаштування"
-                  onClick={() => setSettingsOpen(true)}
-                >
-                  ⚙️
-                </button>
-              </>
+            {isPreviewing && (
+              <span className="chip chip--accent">
+                {PREVIEW_LABELS[previewMode]}
+              </span>
             )}
-            <RoleSwitch
-              value={previewMode}
-              onChange={(mode) =>
-                setPreview(mode === PREVIEW_MODE.ADMIN ? null : mode)
-              }
-            />
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Керування"
+              onClick={() => setMenuOpen(true)}
+            >
+              ☰
+            </button>
           </div>
         ) : (
           <span className="chip chip--accent">{PREVIEW_LABELS[me.role]}</span>
         )}
       </header>
 
+      {menuOpen && (
+        <AdminMenuSheet
+          isAdmin={me.role === ROLE.ADMIN}
+          previewMode={previewMode}
+          onPreviewChange={setPreview}
+          onUsers={() => setUsersOpen(true)}
+          onSubs={() => setSubsOpen(true)}
+          onAdmins={() => setAdminsOpen(true)}
+          onSettings={() => setSettingsOpen(true)}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {adminsOpen && <AdminsSheet onClose={() => setAdminsOpen(false)} />}
       {subsOpen && <SubscriptionsSheet onClose={() => setSubsOpen(false)} />}

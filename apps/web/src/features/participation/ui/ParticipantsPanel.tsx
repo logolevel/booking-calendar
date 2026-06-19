@@ -300,18 +300,6 @@ export function ParticipantsPanel({
             </span>
           )}
         </span>
-        {p.primeWeekCount != null && (
-          <span
-            className={`participants__quota${
-              p.primeWeekCount >= PRIME_TIME_MAX_PER_WEEK
-                ? ' participants__quota--full'
-                : ''
-            }`}
-            title="Записи у прайм-тайм цього тижня"
-          >
-            {p.primeWeekCount}/{PRIME_TIME_MAX_PER_WEEK}
-          </span>
-        )}
         {pairMode === 'pair' && (
           <button
             type="button"
@@ -333,6 +321,18 @@ export function ParticipantsPanel({
           >
             🔗
           </button>
+        )}
+        {p.primeWeekCount != null && (
+          <span
+            className={`participants__quota${
+              p.primeWeekCount >= PRIME_TIME_MAX_PER_WEEK
+                ? ' participants__quota--full'
+                : ''
+            }`}
+            title="Записи у прайм-тайм цього тижня"
+          >
+            {p.primeWeekCount}/{PRIME_TIME_MAX_PER_WEEK}
+          </span>
         )}
         {p.canRemove && !ended && (
           <button
