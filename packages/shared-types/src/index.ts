@@ -230,6 +230,14 @@ export const PARTICIPATION_ACTION = {
   LEAVE: 'leave',
   REMOVE: 'remove',
   PROMOTED: 'promoted',
+  // User joined the waitlist (queue).
+  QUEUED: 'queued',
+  // User left the waitlist (queue).
+  LEFT_QUEUE: 'left_queue',
+  // A visual pair was created (actor with target).
+  PAIRED: 'paired',
+  // A visual pair was dissolved (actor with target).
+  UNPAIRED: 'unpaired',
   // Event fields were edited; details are carried in the log's target field.
   EDITED: 'edited',
 } as const;

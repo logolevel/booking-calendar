@@ -118,7 +118,7 @@ export class ParticipationService {
   }
 
   private logAction(
-    tx: Tx,
+    tx: Tx | PrismaService,
     eventId: string,
     actorId: number,
     action: ParticipationAction,
@@ -611,6 +611,15 @@ export class ParticipationService {
       const removed = await tx.eventWaitlist.deleteMany({
         where: { eventId, userId: BigInt(actorId) },
       });
+      if (removed.count > 0) {
+        await this.logAction(
+          tx,
+          eventId,
+          actorId,
+          PARTICIPATION_ACTION.LEFT_QUEUE,
+          { userId: actorId },
+        );
+      }
       return {
         promoted: null,
         deleted: false,
@@ -697,6 +706,9 @@ export class ParticipationService {
         create: { eventId, userId: BigInt(actorId) },
         update: {},
       });
+      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.QUEUED, {
+        userId: actorId,
+      });
       return 'queued' as const;
     });
 
@@ -742,6 +754,13 @@ export class ParticipationService {
     });
 
     if (removed.count > 0) {
+      await this.logAction(
+        this.prisma,
+        eventId,
+        actorId,
+        PARTICIPATION_ACTION.LEFT_QUEUE,
+        { userId: actorId },
+      );
       const actor = await this.notifications.userDisplay(actorId);
       const verb = EventNotificationsService.verb(
         actor.gender,
@@ -767,6 +786,18 @@ export class ParticipationService {
       where: { eventId, pairId },
       data: { pairId: null },
     });
+  }
+
+  // Resolve a guest's display name for logging, or null when there is none.
+  private async guestNameOf(
+    tx: Tx,
+    guestId: string | null,
+  ): Promise<string | null> {
+    if (!guestId) {
+      return null;
+    }
+    const guest = await tx.guest.findUnique({ where: { id: guestId } });
+    return guest ? this.guests.displayName(guest) : null;
   }
 
   // Display text for a participant: a badged user name, or a plain guest name.
@@ -828,6 +859,10 @@ export class ParticipationService {
         where: { id: { in: [self.id, target.id] } },
         data: { pairId },
       });
+      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.PAIRED, {
+        userId: target.userId != null ? Number(target.userId) : null,
+        guestName: await this.guestNameOf(tx, target.guestId),
+      });
       return { userId: target.userId, guestId: target.guestId };
     });
 
@@ -867,6 +902,10 @@ export class ParticipationService {
       });
       const other = members.find((m) => m.id !== self.id) ?? null;
       await this.dissolvePair(tx, eventId, self.pairId);
+      await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.UNPAIRED, {
+        userId: other?.userId != null ? Number(other.userId) : null,
+        guestName: await this.guestNameOf(tx, other?.guestId ?? null),
+      });
       return other;
     });
 

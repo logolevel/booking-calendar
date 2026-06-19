@@ -937,6 +937,23 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+/* Highlight important roster changes: entering vs leaving the event. */
+.participants__history-item--enter {
+  background: rgba(52, 199, 89, 0.14);
+}
+
+.participants__history-item--exit {
+  background: rgba(255, 59, 48, 0.12);
+}
+
+.participants__history-item--enter,
+.participants__history-item--exit {
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: var(--radius-sm);
+  border-bottom: none;
+}
+
 .participants__edit {
   margin-top: 16px;
 }

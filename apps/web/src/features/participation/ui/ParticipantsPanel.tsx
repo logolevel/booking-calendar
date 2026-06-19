@@ -53,7 +53,21 @@ function logText(entry: ParticipationLogDto): string {
         entry.targetName ?? ''
       }`.trim();
     case 'promoted':
-      return `${entry.targetName ?? entry.actorName} — з черги`;
+      return `${entry.targetName ?? entry.actorName} — з черги в учасники`;
+    case 'queued':
+      return `${entry.actorName} ${genderVerb(g, 'став', 'стала')} у чергу`;
+    case 'left_queue':
+      return `${entry.actorName} ${genderVerb(g, 'вийшов', 'вийшла')} з черги`;
+    case 'paired':
+      return `${entry.actorName} ${genderVerb(g, 'створив', 'створила')} пару${
+        entry.targetName ? ` з ${entry.targetName}` : ''
+      } 🔗`;
+    case 'unpaired':
+      return `${entry.actorName} ${genderVerb(
+        g,
+        'розформував',
+        'розформувала',
+      )} пару${entry.targetName ? ` з ${entry.targetName}` : ''} 🔗`;
     case 'edited':
       return `${entry.actorName} ${genderVerb(g, 'змінив', 'змінила')} подію${
         entry.targetName ? `: ${entry.targetName}` : ''
@@ -61,6 +75,19 @@ function logText(entry: ParticipationLogDto): string {
     default:
       return entry.action;
   }
+}
+
+// History tone: entering the event (join/add/promoted) reads as positive
+// (light green); leaving the event (leave/remove) as negative (light red).
+// Queue/pair/edit actions are neutral (no background).
+function logTone(action: ParticipationLogDto['action']): 'enter' | 'exit' | null {
+  if (action === 'join' || action === 'add' || action === 'promoted') {
+    return 'enter';
+  }
+  if (action === 'leave' || action === 'remove') {
+    return 'exit';
+  }
+  return null;
 }
 
 // A pair group renders its two members together; singles render on their own.
@@ -495,14 +522,26 @@ export function ParticipantsPanel({
               </button>
               {showHistory && (
                 <ul className="participants__history">
-                  {data.log.map((entry) => (
-                    <li key={entry.id}>
-                      <span>{logText(entry)}</span>
-                      <span className="participants__by">
-                        {format(new Date(entry.at), 'd MMM HH:mm', { locale: uk })}
-                      </span>
-                    </li>
-                  ))}
+                  {data.log.map((entry) => {
+                    const tone = logTone(entry.action);
+                    return (
+                      <li
+                        key={entry.id}
+                        className={
+                          tone
+                            ? `participants__history-item--${tone}`
+                            : undefined
+                        }
+                      >
+                        <span>{logText(entry)}</span>
+                        <span className="participants__by">
+                          {format(new Date(entry.at), 'd MMM HH:mm', {
+                            locale: uk,
+                          })}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
