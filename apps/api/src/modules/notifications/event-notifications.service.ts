@@ -199,9 +199,9 @@ export class EventNotificationsService {
           : undefined;
       if (partner) {
         pushBlank();
-        lines.push(`${i}. 🔗 ${labelById.get(p.id) ?? ''}`);
+        lines.push(`${i}. ${labelById.get(p.id) ?? ''} 🔗`);
         i += 1;
-        lines.push(`${i}. 🔗 ${labelById.get(partner.id) ?? ''}`);
+        lines.push(`${i}. ${labelById.get(partner.id) ?? ''} 🔗`);
         i += 1;
         lines.push('');
         rendered.add(p.id);
@@ -312,16 +312,6 @@ export class EventNotificationsService {
     await this.prisma.eventChatMessage.deleteMany({
       where: { eventId, userId: BigInt(userId) },
     });
-  }
-
-  // Refresh every current recipient's main card in place, without any reply.
-  // Used for visual-only changes (e.g. pairing) that should update the card.
-  async refreshCards(eventId: string): Promise<void> {
-    const cardText = await this.card(eventId);
-    const link = await this.telegram.eventDeepLink(eventId);
-    for (const userId of await this.cardRecipients(eventId)) {
-      await this.ensureCard(eventId, userId, cardText, link);
-    }
   }
 
   // Send/refresh the main card for the creator and every admin, with no reply:

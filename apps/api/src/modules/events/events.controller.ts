@@ -22,6 +22,7 @@ import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { VerifiedTelegramUser } from '../../auth/init-data';
 import { AccessService } from '../access/access.service';
+import { EventsGateway } from '../realtime/events.gateway';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 
@@ -42,6 +43,7 @@ export class EventsController {
   constructor(
     private readonly events: EventsService,
     private readonly access: AccessService,
+    private readonly gateway: EventsGateway,
   ) {}
 
   @Get()
@@ -110,7 +112,9 @@ export class EventsController {
   ): Promise<EventDto> {
     const realRole = await this.requireAccess(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
-    return this.events.update(id, user.id, role, dto);
+    const updated = await this.events.update(id, user.id, role, dto);
+    this.gateway.emitEventUpdate(id);
+    return updated;
   }
 
   @Delete(':id')

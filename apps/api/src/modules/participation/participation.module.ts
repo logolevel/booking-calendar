@@ -18,5 +18,6 @@ import { ParticipationService } from './participation.service';
   ],
   controllers: [ParticipationController],
   providers: [ParticipationService, EventsGateway],
+  exports: [ParticipationService, EventsGateway],
 })
 export class ParticipationModule {}

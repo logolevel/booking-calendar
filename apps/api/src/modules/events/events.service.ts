@@ -18,6 +18,7 @@ import { SettingsService } from '../settings/settings.service';
 import { PrimeTimeService } from '../prime-time/prime-time.service';
 import { EventNotificationsService } from '../notifications/event-notifications.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { ParticipationService } from '../participation/participation.service';
 import type { CreateEventDto } from './dto/create-event.dto';
 
 type Db = Prisma.TransactionClient;
@@ -76,6 +77,7 @@ export class EventsService {
     private readonly settings: SettingsService,
     private readonly prime: PrimeTimeService,
     private readonly notifications: EventNotificationsService,
+    private readonly participation: ParticipationService,
   ) {}
 
   async list(from: Date, to: Date): Promise<EventDto[]> {
@@ -214,9 +216,13 @@ export class EventsService {
         ...existing,
         capacity: dto.capacity,
       });
+      // A higher cap may free seats: pull in queued users before announcing.
+      if (dto.capacity > existing.capacity) {
+        await this.participation.promoteToCapacity(id);
+      }
       await this.recordEdit(id, userId, changes);
       await this.notifyChange(id, userId, changes);
-      return this.toDto(event, count);
+      return this.toDto(event, await this.countParticipants(id));
     }
 
     const startsAt = new Date(dto.startsAt);
@@ -258,6 +264,10 @@ export class EventsService {
       }),
     );
     const changes = this.describeChanges(existing, next);
+    // A higher cap may free seats: pull in queued users before announcing.
+    if (next.capacity > existing.capacity) {
+      await this.participation.promoteToCapacity(id);
+    }
     await this.recordEdit(id, userId, changes);
     await this.notifyChange(id, userId, changes);
     return this.toDto(event, await this.countParticipants(id));

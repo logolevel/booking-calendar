@@ -769,6 +769,29 @@ export class ParticipationService {
     });
   }
 
+  // Display text for a participant: a badged user name, or a plain guest name.
+  private async participantDisplay(participant: {
+    userId: bigint | null;
+    guestId: string | null;
+  }): Promise<{ text: string; gender: string | null; userId: number | null }> {
+    if (participant.userId != null) {
+      const id = Number(participant.userId);
+      const display = await this.notifications.userDisplay(id);
+      return { text: display.text, gender: display.gender, userId: id };
+    }
+    if (participant.guestId != null) {
+      const guest = await this.prisma.guest.findUnique({
+        where: { id: participant.guestId },
+      });
+      return {
+        text: guest ? this.guests.displayName(guest) : 'Гість',
+        gender: null,
+        userId: null,
+      };
+    }
+    return { text: 'Учасник', gender: null, userId: null };
+  }
+
   // Visually pair the actor (a participant) with another participant. Has no
   // effect on capacity/quota; each side may only be in one pair at a time.
   async pairWith(
@@ -776,7 +799,7 @@ export class ParticipationService {
     actorId: number,
     targetParticipantId: string,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const partner = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
       const self = await tx.eventParticipant.findUnique({
@@ -805,28 +828,103 @@ export class ParticipationService {
         where: { id: { in: [self.id, target.id] } },
         data: { pairId },
       });
+      return { userId: target.userId, guestId: target.guestId };
     });
-    await this.notifications.refreshCards(eventId);
+
+    const actor = await this.notifications.userDisplay(actorId);
+    const mate = await this.participantDisplay(partner);
+    const overrides = new Map<number, string>([
+      [actorId, `Ви у парі з ${mate.text} 🔗`],
+    ]);
+    if (mate.userId != null) {
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'додав',
+        'додала',
+      );
+      overrides.set(mate.userId, `${actor.text} ${verb} вас у пару 🔗`);
+    }
+    await this.notifications.pushChange(eventId, {
+      actorId,
+      text: `${actor.text} та ${mate.text} — пара 🔗`,
+      overrides,
+    });
   }
 
   // Remove the actor's pair (either side may dissolve it). Visual only.
   async unpair(eventId: string, actorId: number): Promise<void> {
-    let changed = false;
-    await this.prisma.$transaction(async (tx) => {
+    const partner = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
       const self = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
       if (!self?.pairId) {
-        return;
+        return null;
       }
+      const members = await tx.eventParticipant.findMany({
+        where: { eventId, pairId: self.pairId },
+      });
+      const other = members.find((m) => m.id !== self.id) ?? null;
       await this.dissolvePair(tx, eventId, self.pairId);
-      changed = true;
+      return other;
     });
-    if (changed) {
-      await this.notifications.refreshCards(eventId);
+
+    if (!partner) {
+      return;
     }
+    const actor = await this.notifications.userDisplay(actorId);
+    const mate = await this.participantDisplay(partner);
+    const overrides = new Map<number, string>([
+      [actorId, 'Ви розформували пару 🔗'],
+    ]);
+    if (mate.userId != null) {
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'розформував',
+        'розформувала',
+      );
+      overrides.set(mate.userId, `${actor.text} ${verb} пару з вами 🔗`);
+    }
+    await this.notifications.pushChange(eventId, {
+      actorId,
+      text: `Пару розформовано: ${actor.text} та ${mate.text}`,
+      overrides,
+    });
+  }
+
+  // Promote as many queued users as the (possibly increased) capacity now
+  // allows. Returns promoted user ids in promotion order. Used after a capacity
+  // change, where several freed seats may pull in multiple queued users.
+  async promoteToCapacity(eventId: string): Promise<number[]> {
+    const promoted: number[] = [];
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      let next = await this.promoteFromWaitlist(tx, eventId, event);
+      while (next != null) {
+        promoted.push(next);
+        next = await this.promoteFromWaitlist(tx, eventId, event);
+      }
+    });
+    if (promoted.length > 0) {
+      const overrides = new Map<number, string>();
+      for (const id of promoted) {
+        overrides.set(id, 'Ви з черги потрапили в учасники ✅');
+      }
+      const names = (
+        await Promise.all(
+          promoted.map((id) => this.notifications.userDisplay(id)),
+        )
+      )
+        .map((d) => d.text)
+        .join(', ');
+      await this.notifications.pushChange(eventId, {
+        actorId: promoted[0],
+        text: `${names} — з черги в учасники ✅`,
+        overrides,
+      });
+    }
+    return promoted;
   }
 
   async getDetails(
