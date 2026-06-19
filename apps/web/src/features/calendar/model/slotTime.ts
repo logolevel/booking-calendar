@@ -60,23 +60,33 @@ function minutesOfDay(date: Date): number {
   return date.getHours() * 60 + date.getMinutes();
 }
 
+// Prime-time applies on weekdays (Mon–Fri) only; weekends are free.
+export function isWeekday(date: Date): boolean {
+  const dow = date.getDay();
+  return dow >= 1 && dow <= 5;
+}
+
 // True when a 30-minute slot starting at `date` sits inside the prime window.
+// Weekend slots are never prime.
 export function isPrimeSlot(
   date: Date,
   primeStartMin: number,
   primeEndMin: number,
 ): boolean {
+  if (!isWeekday(date)) return false;
   const min = minutesOfDay(date);
   return min >= primeStartMin && min < primeEndMin;
 }
 
 // True when the [start, end) range overlaps the prime window (same day).
+// Weekend ranges never overlap prime.
 export function overlapsPrime(
   start: Date,
   end: Date,
   primeStartMin: number,
   primeEndMin: number,
 ): boolean {
+  if (!isWeekday(start)) return false;
   return minutesOfDay(start) < primeEndMin && minutesOfDay(end) > primeStartMin;
 }
 

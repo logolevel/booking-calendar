@@ -63,6 +63,14 @@ export class PrimeTimeService {
     return dayIndex - offsetToMonday;
   }
 
+  // Prime-time (both the weekly quota and the access gate) applies on weekdays
+  // only; weekends are free. 1970-01-01 was a Thursday, so dowSunday0 maps
+  // 0=Sun..6=Sat and Mon–Fri are 1..5.
+  private static isWeekday(dayIndex: number): boolean {
+    const dowSunday0 = (dayIndex + 4) % 7;
+    return dowSunday0 >= 1 && dowSunday0 <= 5;
+  }
+
   private static toMinutes(hhmm: string): number {
     const [h, m] = hhmm.split(':');
     return Number(h) * 60 + Number(m);
@@ -101,18 +109,25 @@ export class PrimeTimeService {
   }
 
   // Whether the event's own window overlaps the prime (weekly-quota) window.
+  // Weekend events are never in prime.
   async eventInPrime(event: PrimeEvent): Promise<boolean> {
     const { start, end } = await this.primeWindow();
     const s = PrimeTimeService.kyivParts(event.startsAt);
+    if (!PrimeTimeService.isWeekday(s.dayIndex)) {
+      return false;
+    }
     const e = PrimeTimeService.kyivParts(event.endsAt);
     return PrimeTimeService.overlaps(s.minutes, e.minutes, start, end);
   }
 
   // Whether the event's own window overlaps the subscription-prime (access
-  // gate) window.
+  // gate) window. Weekend events are never in sub-prime.
   async eventInSubPrime(event: PrimeEvent): Promise<boolean> {
     const { start, end } = await this.subPrimeWindow();
     const s = PrimeTimeService.kyivParts(event.startsAt);
+    if (!PrimeTimeService.isWeekday(s.dayIndex)) {
+      return false;
+    }
     const e = PrimeTimeService.kyivParts(event.endsAt);
     return PrimeTimeService.overlaps(s.minutes, e.minutes, start, end);
   }
@@ -194,7 +209,10 @@ export class PrimeTimeService {
     const { start, end } = await this.primeWindow();
     const target = PrimeTimeService.kyivParts(event.startsAt);
     const targetEnd = PrimeTimeService.kyivParts(event.endsAt);
-    if (!PrimeTimeService.overlaps(target.minutes, targetEnd.minutes, start, end)) {
+    if (
+      !PrimeTimeService.isWeekday(target.dayIndex) ||
+      !PrimeTimeService.overlaps(target.minutes, targetEnd.minutes, start, end)
+    ) {
       return { inPrime: false, primeCount: 0, greenCount: 0 };
     }
 
@@ -215,6 +233,9 @@ export class PrimeTimeService {
       const s = PrimeTimeService.kyivParts(row.event.startsAt);
       const e = PrimeTimeService.kyivParts(row.event.endsAt);
       if (PrimeTimeService.weekKey(s.dayIndex) !== targetWeek) {
+        continue;
+      }
+      if (!PrimeTimeService.isWeekday(s.dayIndex)) {
         continue;
       }
       if (!PrimeTimeService.overlaps(s.minutes, e.minutes, start, end)) {
@@ -340,6 +361,9 @@ export class PrimeTimeService {
       const s = PrimeTimeService.kyivParts(row.event.startsAt);
       const e = PrimeTimeService.kyivParts(row.event.endsAt);
       if (PrimeTimeService.weekKey(s.dayIndex) !== targetWeek) {
+        continue;
+      }
+      if (!PrimeTimeService.isWeekday(s.dayIndex)) {
         continue;
       }
       if (!PrimeTimeService.overlaps(s.minutes, e.minutes, start, end)) {
