@@ -37,7 +37,6 @@ export class ParticipationService {
     private readonly access: AccessService,
     private readonly users: UsersService,
     private readonly guests: GuestsService,
-    private readonly telegram: TelegramService,
     private readonly prime: PrimeTimeService,
     private readonly notifications: EventNotificationsService,
   ) {}
@@ -229,17 +228,16 @@ export class ParticipationService {
 
     if (joined) {
       const actor = await this.notifications.userDisplay(actorId);
-      const label = await this.notifications.label(eventId);
       const verb = EventNotificationsService.verb(
         actor.gender,
         'записався',
         'записалася',
       );
-      await this.notifications.broadcast(
-        eventId,
-        `${actor.text} ${verb} на ${label}`,
-        [actorId],
-      );
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb}`,
+        overrides: new Map([[actorId, 'Ви записалися ✅']]),
+      });
     }
   }
 
@@ -310,9 +308,8 @@ export class ParticipationService {
       });
     });
 
-    // Notifications only after a successful commit.
-    const label = await this.notifications.label(eventId);
-    const link = await this.telegram.eventDeepLink(eventId);
+    // Notifications only after a successful commit. The added user becomes a
+    // participant, so the card refresh reaches them; admins are always included.
     const actor = await this.notifications.userDisplay(actorId);
     const target = await this.notifications.userDisplay(targetUserId);
     const added = EventNotificationsService.verb(
@@ -320,25 +317,11 @@ export class ParticipationService {
       'додав',
       'додала',
     );
-    await this.telegram.notifyUser(
-      targetUserId,
-      `Вас ${added} ${actor.text} на ${label}`,
-      link,
-    );
-    // Skip the admin copy when the added person is the admin recipient: they
-    // already got the "you were added" message above.
-    if (role !== Role.admin && !this.access.isRoot(targetUserId)) {
-      await this.telegram.notifyAdmin(
-        `${actor.text} ${added} ${target.text} на ${label}`,
-        link,
-      );
-    }
-    // Everyone else in the event learns about the new participant.
-    await this.notifications.broadcast(
-      eventId,
-      `${actor.text} ${added} ${target.text} на ${label}`,
-      [actorId, targetUserId],
-    );
+    await this.notifications.pushChange(eventId, {
+      actorId,
+      text: `${actor.text} ${added} ${target.text}`,
+      overrides: new Map([[targetUserId, `Вас ${added} ${actor.text}`]]),
+    });
   }
 
   // Shared "+1" rule: non-admins must already be in and may add one extra
@@ -452,13 +435,13 @@ export class ParticipationService {
     guestName: string,
   ): Promise<void> {
     const actor = await this.notifications.userDisplay(actorId);
-    const label = await this.notifications.label(eventId);
     const verb = EventNotificationsService.verb(actor.gender, 'додав', 'додала');
-    await this.notifications.broadcast(
-      eventId,
-      `${actor.text} ${verb} гостя ${guestName} на ${label}`,
-      [actorId],
-    );
+    await this.notifications.pushChange(eventId, {
+      actorId,
+      text: `${actor.text} ${verb} гостя ${TelegramService.escapeHtml(
+        guestName,
+      )}`,
+    });
   }
 
   async removeParticipant(
@@ -467,6 +450,9 @@ export class ParticipationService {
     role: Role,
     participantId: string,
   ): Promise<boolean> {
+    // Captured up front in case the removal empties (and deletes) the event,
+    // which cascade-removes the cards we still need to mark as cancelled.
+    const cancel = await this.notifications.cancelSnapshot(eventId);
     const result = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
@@ -517,15 +503,17 @@ export class ParticipationService {
       };
     });
 
-    if (!result.deleted) {
-      await this.notifyPromoted(eventId, result.promoted);
+    if (result.deleted) {
+      await this.notifications.pushCancelled(cancel, 'Подію скасовано');
+      return result.deleted;
     }
     await this.notifyRemoval(eventId, actorId, result);
     return result.deleted;
   }
 
-  // Tell the removed person (if a registered user) and the rest of the event.
-  // Self-removal reads as "left"; removing someone else reads as "removed".
+  // Refresh the card for everyone and reply about the removal. The removed user
+  // (if registered) gets a personal reply and is then untracked; a promoted
+  // waitlist user is told they made it in. Self-removal reads as "left".
   private async notifyRemoval(
     eventId: string,
     actorId: number,
@@ -538,10 +526,9 @@ export class ParticipationService {
     },
   ): Promise<void> {
     const actor = await this.notifications.userDisplay(actorId);
-    const label = await this.notifications.label(eventId);
-    const exclude = [actorId];
+    const overrides = new Map<number, string>();
     if (result.promoted != null) {
-      exclude.push(result.promoted);
+      overrides.set(result.promoted, 'Ви з черги потрапили в учасники ✅');
     }
 
     if (result.isSelf) {
@@ -550,11 +537,13 @@ export class ParticipationService {
         'вийшов',
         'вийшла',
       );
-      await this.notifications.broadcast(
-        eventId,
-        `${actor.text} ${verb} з ${label}`,
-        exclude,
-      );
+      overrides.set(actorId, 'Ви вийшли з події');
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb}`,
+        overrides,
+        departing: [actorId],
+      });
       return;
     }
 
@@ -564,35 +553,35 @@ export class ParticipationService {
       'видалила',
     );
     if (result.guestName) {
-      await this.notifications.broadcast(
-        eventId,
-        `${actor.text} ${verb} гостя ${result.guestName} з ${label}`,
-        exclude,
-      );
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb} гостя ${TelegramService.escapeHtml(
+          result.guestName,
+        )}`,
+        overrides,
+      });
       return;
     }
 
     const removedId = result.removedUserId;
-    if (removedId != null) {
-      await this.notifications.notify(
-        eventId,
-        [removedId],
-        `Вас ${verb} ${actor.text} з ${label}`,
-      );
-      exclude.push(removedId);
-    }
     const removed =
       removedId != null
         ? (await this.notifications.userDisplay(removedId)).text
         : 'учасника';
-    await this.notifications.broadcast(
-      eventId,
-      `${actor.text} ${verb} ${removed} з ${label}`,
-      exclude,
-    );
+    if (removedId != null) {
+      overrides.set(removedId, `Вас ${verb} ${actor.text}`);
+    }
+    await this.notifications.pushChange(eventId, {
+      actorId,
+      text: `${actor.text} ${verb} ${removed}`,
+      overrides,
+      include: removedId != null ? [removedId] : undefined,
+      departing: removedId != null ? [removedId] : undefined,
+    });
   }
 
   async leaveSelf(eventId: string, actorId: number): Promise<boolean> {
+    const cancel = await this.notifications.cancelSnapshot(eventId);
     const result = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       this.assertActive(event.endsAt);
@@ -622,58 +611,46 @@ export class ParticipationService {
       };
     });
 
-    if (!result.deleted) {
-      await this.notifyPromoted(eventId, result.promoted);
+    if (result.deleted) {
+      await this.notifications.pushCancelled(cancel, 'Подію скасовано');
+      return result.deleted;
     }
 
-    if (result.outcome === 'left' && !result.deleted) {
+    if (result.outcome === 'left') {
       const actor = await this.notifications.userDisplay(actorId);
-      const label = await this.notifications.label(eventId);
       const verb = EventNotificationsService.verb(
         actor.gender,
         'вийшов',
         'вийшла',
       );
-      const exclude = [actorId];
+      const overrides = new Map<number, string>([
+        [actorId, 'Ви вийшли з події'],
+      ]);
       if (result.promoted != null) {
-        exclude.push(result.promoted);
+        overrides.set(result.promoted, 'Ви з черги потрапили в учасники ✅');
       }
-      await this.notifications.broadcast(
-        eventId,
-        `${actor.text} ${verb} з ${label}`,
-        exclude,
-      );
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb}`,
+        overrides,
+        departing: [actorId],
+      });
     } else if (result.outcome === 'leftQueue') {
       const actor = await this.notifications.userDisplay(actorId);
-      const label = await this.notifications.label(eventId);
       const verb = EventNotificationsService.verb(
         actor.gender,
         'вийшов',
         'вийшла',
       );
-      await this.notifications.broadcast(
-        eventId,
-        `${actor.text} ${verb} з черги на ${label}`,
-        [actorId],
-      );
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb} з черги`,
+        overrides: new Map([[actorId, 'Ви вийшли з черги']]),
+        departing: [actorId],
+      });
     }
 
     return result.deleted;
-  }
-
-  private async notifyPromoted(
-    eventId: string,
-    promotedUserId: number | null,
-  ): Promise<void> {
-    if (promotedUserId == null) {
-      return;
-    }
-    const label = await this.notifications.label(eventId);
-    await this.notifications.notify(
-      eventId,
-      [promotedUserId],
-      `Ви з черги потрапили на ${label}`,
-    );
   }
 
   async joinWaitlist(
@@ -720,20 +697,29 @@ export class ParticipationService {
       return;
     }
     const actor = await this.notifications.userDisplay(actorId);
-    const label = await this.notifications.label(eventId);
-    const text =
-      outcome === 'joined'
-        ? `${actor.text} ${EventNotificationsService.verb(
-            actor.gender,
-            'записався',
-            'записалася',
-          )} на ${label}`
-        : `${actor.text} ${EventNotificationsService.verb(
-            actor.gender,
-            'став',
-            'стала',
-          )} у чергу на ${label}`;
-    await this.notifications.broadcast(eventId, text, [actorId]);
+    if (outcome === 'joined') {
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'записався',
+        'записалася',
+      );
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb}`,
+        overrides: new Map([[actorId, 'Ви записалися ✅']]),
+      });
+    } else {
+      const verb = EventNotificationsService.verb(
+        actor.gender,
+        'став',
+        'стала',
+      );
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb} у чергу`,
+        overrides: new Map([[actorId, 'Ви стали у чергу']]),
+      });
+    }
   }
 
   async leaveWaitlist(eventId: string, actorId: number): Promise<void> {
@@ -750,17 +736,17 @@ export class ParticipationService {
 
     if (removed.count > 0) {
       const actor = await this.notifications.userDisplay(actorId);
-      const label = await this.notifications.label(eventId);
       const verb = EventNotificationsService.verb(
         actor.gender,
         'вийшов',
         'вийшла',
       );
-      await this.notifications.broadcast(
-        eventId,
-        `${actor.text} ${verb} з черги на ${label}`,
-        [actorId],
-      );
+      await this.notifications.pushChange(eventId, {
+        actorId,
+        text: `${actor.text} ${verb} з черги`,
+        overrides: new Map([[actorId, 'Ви вийшли з черги']]),
+        departing: [actorId],
+      });
     }
   }
 

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { AccessModule } from '../access/access.module';
 import { UsersModule } from '../users/users.module';
 import { GuestsModule } from '../guests/guests.module';
-import { TelegramModule } from '../telegram/telegram.module';
 import { PrimeTimeModule } from '../prime-time/prime-time.module';
 import { EventNotificationsModule } from '../notifications/event-notifications.module';
 import { EventsGateway } from '../realtime/events.gateway';
@@ -14,7 +13,6 @@ import { ParticipationService } from './participation.service';
     AccessModule,
     UsersModule,
     GuestsModule,
-    TelegramModule,
     PrimeTimeModule,
     EventNotificationsModule,
   ],

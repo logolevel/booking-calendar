@@ -17,6 +17,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { PrimeTimeService } from '../prime-time/prime-time.service';
 import { EventNotificationsService } from '../notifications/event-notifications.service';
+import { TelegramService } from '../telegram/telegram.service';
 import type { CreateEventDto } from './dto/create-event.dto';
 
 type Db = Prisma.TransactionClient;
@@ -173,6 +174,7 @@ export class EventsService {
       }),
     );
 
+    await this.notifications.pushCreated(event.id, userId);
     return this.toDto(event, joinSelf ? 1 : 0);
   }
 
@@ -357,7 +359,7 @@ export class EventsService {
     });
   }
 
-  // Tell everyone in the event (except the editor) what exactly changed.
+  // Refresh the event card for everyone and reply with what exactly changed.
   // Nothing actually changed → no notification (avoids empty noise).
   private async notifyChange(
     eventId: string,
@@ -368,18 +370,18 @@ export class EventsService {
       return;
     }
     const actor = await this.notifications.userDisplay(actorId);
-    const label = await this.notifications.label(eventId);
     const verb = EventNotificationsService.verb(
       actor.gender,
       'змінив',
       'змінила',
     );
-    const details = changes.map((c) => `• ${c}`).join('\n');
-    await this.notifications.broadcast(
-      eventId,
-      `${actor.text} ${verb} подію ${label}:\n${details}`,
-      [actorId],
-    );
+    const details = changes
+      .map((c) => `• ${TelegramService.escapeHtml(c)}`)
+      .join('\n');
+    await this.notifications.pushChange(eventId, {
+      actorId,
+      text: `${actor.text} ${verb} подію:\n${details}`,
+    });
   }
 
   private countParticipants(eventId: string): Promise<number> {
@@ -398,9 +400,8 @@ export class EventsService {
       throw new ForbiddenException('Only the author or an admin can delete');
     }
 
-    // Capture recipients and label before the row (and its participants) vanish.
-    const audience = await this.notifications.audience(id);
-    const label = await this.notifications.label(id);
+    // Capture cards/label before the row (and its cascade-deleted cards) vanish.
+    const snapshot = await this.notifications.cancelSnapshot(id);
     const actor = await this.notifications.userDisplay(userId);
 
     await this.prisma.event.delete({ where: { id } });
@@ -410,10 +411,9 @@ export class EventsService {
       'скасував',
       'скасувала',
     );
-    await this.notifications.notify(
-      id,
-      audience.filter((uid) => uid !== userId),
-      `${actor.text} ${verb} подію ${label}`,
+    await this.notifications.pushCancelled(
+      snapshot,
+      `${actor.text} ${verb} подію`,
     );
   }
 

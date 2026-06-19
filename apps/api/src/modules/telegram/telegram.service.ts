@@ -8,7 +8,12 @@ import type { TelegramUpdate } from './telegram.types';
 interface TelegramApiResponse<T> {
   ok: boolean;
   result?: T;
+  description?: string;
 }
+
+// Outcome of an editMessageText call: 'unmodified' means Telegram rejected the
+// edit only because the text was identical (safe to treat as success).
+export type EditResult = 'ok' | 'unmodified' | 'failed';
 
 @Injectable()
 export class TelegramService {
@@ -279,11 +284,67 @@ export class TelegramService {
     await this.sendMessage(userId, text, link);
   }
 
-  async notifyAdmin(text: string, link?: string | null): Promise<void> {
-    const adminId = Number(this.config.get<string>('ADMIN_ID'));
-    if (Number.isFinite(adminId)) {
-      await this.sendMessage(adminId, text, link);
+  // Send an event "main" message (already-built HTML) with the deep link line,
+  // returning its message_id so it can later be edited and replied to.
+  async sendEventCard(
+    chatId: number,
+    html: string,
+    link?: string | null,
+  ): Promise<number | null> {
+    const res = await this.callApi<{ message_id: number }>('sendMessage', {
+      chat_id: chatId,
+      text: TelegramService.withLink(html, link),
+      parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
+    });
+    return res?.ok ? res.result?.message_id ?? null : null;
+  }
+
+  // Edit an existing event main message in place to the latest HTML card.
+  async editEventCard(
+    chatId: number,
+    messageId: number,
+    html: string,
+    link?: string | null,
+  ): Promise<EditResult> {
+    const res = await this.callApi('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text: TelegramService.withLink(html, link),
+      parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
+    });
+    if (res?.ok) {
+      return 'ok';
     }
+    if (res?.description?.includes('not modified')) {
+      return 'unmodified';
+    }
+    return 'failed';
+  }
+
+  // Reply (threaded) to a previously sent event main message.
+  async replyMessage(
+    chatId: number,
+    html: string,
+    replyToMessageId: number,
+  ): Promise<void> {
+    await this.callApi('sendMessage', {
+      chat_id: chatId,
+      text: html,
+      parse_mode: 'HTML',
+      reply_parameters: { message_id: replyToMessageId },
+      link_preview_options: { is_disabled: true },
+    });
+  }
+
+  private static withLink(html: string, link?: string | null): string {
+    if (!link) {
+      return html;
+    }
+    return `${html}\n\n🔗 <a href="${TelegramService.escapeHtml(
+      link,
+    )}">Відкрити подію</a>`;
   }
 
   private async sendMessage(
@@ -307,7 +368,7 @@ export class TelegramService {
     await this.callApi('sendMessage', { chat_id: chatId, text });
   }
 
-  private static escapeHtml(value: string): string {
+  static escapeHtml(value: string): string {
     return value
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

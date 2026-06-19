@@ -97,6 +97,7 @@ model Event {
   participants EventParticipant[]
   waitlist     EventWaitlist[]
   logs         EventParticipationLog[]
+  chatMessages EventChatMessage[]
 
   // A Postgres EXCLUDE constraint ("Event_no_overlap") forbids two events on the
   // same resourceId from overlapping in time. It cannot be expressed in Prisma
@@ -160,4 +161,20 @@ model EventParticipationLog {
   event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, at])
+}
+
+// The bot's "main" message about an event in a recipient's private chat. Edited
+// in place to keep the latest event state; change notices are sent as replies
+// to this message. One row per (event, recipient).
+model EventChatMessage {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    BigInt
+  messageId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
 }
