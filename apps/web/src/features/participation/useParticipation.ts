@@ -12,9 +12,11 @@ import {
   joinWaitlist,
   leaveEvent,
   leaveWaitlist,
+  pairParticipant,
   removeParticipant,
   searchGuests,
   searchUsers,
+  unpairSelf,
 } from './api';
 
 const participantsKey = (eventId: string): [string, string] => [
@@ -65,6 +67,15 @@ export function useParticipationActions(eventId: string) {
     mutationFn: () => leaveWaitlist(eventId),
     onSuccess,
   });
+  const pair = useMutation({
+    mutationFn: (participantId: string) =>
+      pairParticipant(eventId, participantId),
+    onSuccess,
+  });
+  const unpair = useMutation({
+    mutationFn: () => unpairSelf(eventId),
+    onSuccess,
+  });
 
   const isPending =
     join.isPending ||
@@ -74,7 +85,9 @@ export function useParticipationActions(eventId: string) {
     createNewGuest.isPending ||
     remove.isPending ||
     queue.isPending ||
-    unqueue.isPending;
+    unqueue.isPending ||
+    pair.isPending ||
+    unpair.isPending;
 
   // The most recent failing action (e.g. prime-time quota) for display.
   const error =
@@ -86,6 +99,8 @@ export function useParticipationActions(eventId: string) {
     leave.error ||
     remove.error ||
     unqueue.error ||
+    pair.error ||
+    unpair.error ||
     null;
 
   return {
@@ -97,6 +112,8 @@ export function useParticipationActions(eventId: string) {
     remove,
     queue,
     unqueue,
+    pair,
+    unpair,
     isPending,
     error,
   };

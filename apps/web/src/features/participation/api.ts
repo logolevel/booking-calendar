@@ -50,6 +50,24 @@ export function removeParticipant(
   );
 }
 
+export function pairParticipant(
+  eventId: string,
+  participantId: string,
+): Promise<EventParticipantsResponse> {
+  return apiPost<EventParticipantsResponse>(
+    `/api/events/${eventId}/participants/${participantId}/pair`,
+    {},
+  );
+}
+
+export function unpairSelf(
+  eventId: string,
+): Promise<EventParticipantsResponse> {
+  return apiDelete<EventParticipantsResponse>(
+    `/api/events/${eventId}/participants/pair/me`,
+  );
+}
+
 export function joinWaitlist(
   eventId: string,
 ): Promise<EventParticipantsResponse> {

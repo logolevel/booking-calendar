@@ -162,20 +162,58 @@ export class EventNotificationsService {
     lines.push(`👥 Учасники (${participants.length}/${event.capacity}):`);
     if (participants.length === 0) {
       lines.push('—');
-    } else {
-      let i = 1;
-      for (const p of participants) {
-        if (p.userId != null) {
-          const id = Number(p.userId);
-          const profile = profiles.get(id);
-          const badge = await this.badge(id, profile?.isAdmin ?? false);
-          lines.push(`${i}. ${badge} ${esc(profile?.name ?? 'Учасник')}`);
-        } else if (p.guestId != null) {
-          const guest = guestMap.get(p.guestId);
-          lines.push(`${i}. 👥 ${esc(guest?.name ?? 'Гість')} (гість)`);
-        }
-        i += 1;
+      return lines.join('\n');
+    }
+
+    const labelById = new Map<string, string>();
+    for (const p of participants) {
+      if (p.userId != null) {
+        const id = Number(p.userId);
+        const profile = profiles.get(id);
+        const badge = await this.badge(id, profile?.isAdmin ?? false);
+        labelById.set(p.id, `${badge} ${esc(profile?.name ?? 'Учасник')}`);
+      } else if (p.guestId != null) {
+        const guest = guestMap.get(p.guestId);
+        labelById.set(p.id, `👥 ${esc(guest?.name ?? 'Гість')} (гість)`);
+      } else {
+        labelById.set(p.id, '—');
       }
+    }
+
+    // Render in join order; a pair's two members are shown together (each
+    // marked 🔗) with a blank line around the block to set them apart.
+    const pushBlank = (): void => {
+      if (lines.length > 0 && lines[lines.length - 1] !== '') {
+        lines.push('');
+      }
+    };
+    const rendered = new Set<string>();
+    let i = 1;
+    for (const p of participants) {
+      if (rendered.has(p.id)) {
+        continue;
+      }
+      const partner =
+        p.pairId != null
+          ? participants.find((o) => o.id !== p.id && o.pairId === p.pairId)
+          : undefined;
+      if (partner) {
+        pushBlank();
+        lines.push(`${i}. 🔗 ${labelById.get(p.id) ?? ''}`);
+        i += 1;
+        lines.push(`${i}. 🔗 ${labelById.get(partner.id) ?? ''}`);
+        i += 1;
+        lines.push('');
+        rendered.add(p.id);
+        rendered.add(partner.id);
+      } else {
+        lines.push(`${i}. ${labelById.get(p.id) ?? ''}`);
+        i += 1;
+        rendered.add(p.id);
+      }
+    }
+    while (lines.length > 0 && lines[lines.length - 1] === '') {
+      lines.pop();
     }
     return lines.join('\n');
   }
@@ -274,6 +312,16 @@ export class EventNotificationsService {
     await this.prisma.eventChatMessage.deleteMany({
       where: { eventId, userId: BigInt(userId) },
     });
+  }
+
+  // Refresh every current recipient's main card in place, without any reply.
+  // Used for visual-only changes (e.g. pairing) that should update the card.
+  async refreshCards(eventId: string): Promise<void> {
+    const cardText = await this.card(eventId);
+    const link = await this.telegram.eventDeepLink(eventId);
+    for (const userId of await this.cardRecipients(eventId)) {
+      await this.ensureCard(eventId, userId, cardText, link);
+    }
   }
 
   // Send/refresh the main card for the creator and every admin, with no reply:

@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma, Role } from '@prisma/client';
 import {
   PARTICIPATION_ACTION,
@@ -478,6 +479,9 @@ export class ParticipationService {
         : null;
 
       await tx.eventParticipant.delete({ where: { id: participant.id } });
+      if (participant.pairId) {
+        await this.dissolvePair(tx, eventId, participant.pairId);
+      }
       await this.logAction(
         tx,
         eventId,
@@ -591,6 +595,9 @@ export class ParticipationService {
       if (mine) {
         const wasAuthor = mine.userId != null && mine.userId === event.createdBy;
         await tx.eventParticipant.delete({ where: { id: mine.id } });
+        if (mine.pairId) {
+          await this.dissolvePair(tx, eventId, mine.pairId);
+        }
         await this.logAction(tx, eventId, actorId, PARTICIPATION_ACTION.LEAVE, {
           userId: actorId,
         });
@@ -750,6 +757,78 @@ export class ParticipationService {
     }
   }
 
+  // Clear a pair, leaving both former members unpaired. Visual only.
+  private dissolvePair(
+    tx: Tx,
+    eventId: string,
+    pairId: string,
+  ): Promise<unknown> {
+    return tx.eventParticipant.updateMany({
+      where: { eventId, pairId },
+      data: { pairId: null },
+    });
+  }
+
+  // Visually pair the actor (a participant) with another participant. Has no
+  // effect on capacity/quota; each side may only be in one pair at a time.
+  async pairWith(
+    eventId: string,
+    actorId: number,
+    targetParticipantId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
+      const self = await tx.eventParticipant.findUnique({
+        where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+      });
+      if (!self) {
+        throw new ForbiddenException('Join the event to create a pair');
+      }
+      if (self.pairId) {
+        throw new ConflictException('You are already in a pair');
+      }
+      const target = await tx.eventParticipant.findUnique({
+        where: { id: targetParticipantId },
+      });
+      if (!target || target.eventId !== eventId) {
+        throw new NotFoundException('Participant not found');
+      }
+      if (target.id === self.id) {
+        throw new BadRequestException('Cannot pair with yourself');
+      }
+      if (target.pairId) {
+        throw new ConflictException('Participant is already in a pair');
+      }
+      const pairId = randomUUID();
+      await tx.eventParticipant.updateMany({
+        where: { id: { in: [self.id, target.id] } },
+        data: { pairId },
+      });
+    });
+    await this.notifications.refreshCards(eventId);
+  }
+
+  // Remove the actor's pair (either side may dissolve it). Visual only.
+  async unpair(eventId: string, actorId: number): Promise<void> {
+    let changed = false;
+    await this.prisma.$transaction(async (tx) => {
+      const event = await this.lockEvent(tx, eventId);
+      this.assertActive(event.endsAt);
+      const self = await tx.eventParticipant.findUnique({
+        where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
+      });
+      if (!self?.pairId) {
+        return;
+      }
+      await this.dissolvePair(tx, eventId, self.pairId);
+      changed = true;
+    });
+    if (changed) {
+      await this.notifications.refreshCards(eventId);
+    }
+  }
+
   async getDetails(
     eventId: string,
     actorId: number,
@@ -852,6 +931,7 @@ export class ParticipationService {
           addedByGender: profiles.get(Number(p.addedByUserId))?.gender ?? null,
           isSelf,
           canRemove: role === Role.admin || p.addedByUserId === actor || isSelf,
+          pairId: p.pairId,
           joinedAt: p.joinedAt.toISOString(),
           primeWeekCount:
             p.userId != null

@@ -128,6 +128,9 @@ model EventParticipant {
   userId        BigInt?
   guestId       String?
   addedByUserId BigInt
+  // Visual-only beach-volley pairing: two participants sharing the same pairId
+  // form a pair. Has no effect on capacity, quota or any event logic.
+  pairId        String?
   joinedAt      DateTime @default(now())
   event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   guest         Guest?   @relation(fields: [guestId], references: [id], onDelete: Cascade)
@@ -135,6 +138,7 @@ model EventParticipant {
   @@unique([eventId, userId])
   @@unique([eventId, guestId])
   @@index([eventId])
+  @@index([eventId, pairId])
 }
 
 // FIFO waiting list; a user gets auto-promoted when a slot frees up.

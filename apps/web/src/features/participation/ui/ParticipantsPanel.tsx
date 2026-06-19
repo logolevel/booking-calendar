@@ -7,6 +7,7 @@ import {
   PRIME_TIME_MAX_PER_WEEK,
   type EventDto,
   type Gender,
+  type ParticipantDto,
   type ParticipationLogDto,
 } from '@tg-calendar/shared-types';
 import { eventTypeLabel, resourceLabel } from '../../calendar/eventLabels';
@@ -62,6 +63,35 @@ function logText(entry: ParticipationLogDto): string {
   }
 }
 
+// A pair group renders its two members together; singles render on their own.
+type ParticipantGroup =
+  | { kind: 'single'; p: ParticipantDto }
+  | { kind: 'pair'; members: [ParticipantDto, ParticipantDto] };
+
+// Keep join order, but render a pair's two members together as one group.
+function groupParticipants(list: ParticipantDto[]): ParticipantGroup[] {
+  const groups: ParticipantGroup[] = [];
+  const seen = new Set<string>();
+  for (const p of list) {
+    if (seen.has(p.id)) {
+      continue;
+    }
+    const partner =
+      p.pairId != null
+        ? list.find((o) => o.id !== p.id && o.pairId === p.pairId)
+        : undefined;
+    if (partner) {
+      groups.push({ kind: 'pair', members: [p, partner] });
+      seen.add(p.id);
+      seen.add(partner.id);
+    } else {
+      groups.push({ kind: 'single', p });
+      seen.add(p.id);
+    }
+  }
+  return groups;
+}
+
 interface Props {
   event: EventDto;
   onEdit: () => void;
@@ -113,6 +143,13 @@ export function ParticipantsPanel({
     setConfirm({
       message: 'Ви дійсно хочете вийти з черги?',
       onConfirm: () => actions.unqueue.mutate(),
+    });
+  };
+
+  const askUnpair = (): void => {
+    setConfirm({
+      message: 'Прибрати учасника зі своєї пари?',
+      onConfirm: () => actions.unpair.mutate(),
     });
   };
 
@@ -198,6 +235,93 @@ export function ParticipantsPanel({
     (u) => !existingIds.has(u.id),
   );
 
+  const selfParticipant = data?.participants.find((p) => p.isSelf) ?? null;
+  const selfPairId = selfParticipant?.pairId ?? null;
+  const pairGroups = groupParticipants(data?.participants ?? []);
+
+  // Which 🔗 control (if any) to show next to a participant for this viewer:
+  // unpaired viewers may pair with any free participant; a paired viewer only
+  // sees the unpair control next to their own partner.
+  const pairModeFor = (p: ParticipantDto): 'pair' | 'unpair' | null => {
+    if (ended || !selfParticipant || p.isSelf) {
+      return null;
+    }
+    if (selfPairId) {
+      return p.pairId === selfPairId ? 'unpair' : null;
+    }
+    return p.pairId ? null : 'pair';
+  };
+
+  const renderMember = (p: ParticipantDto): JSX.Element => {
+    const pairMode = pairModeFor(p);
+    return (
+      <>
+        <span className="participants__name">
+          <PersonName
+            name={p.name}
+            gender={p.gender}
+            isAdmin={p.isAdmin}
+            isUser={p.userId != null}
+            isRoot={p.isRoot}
+          />
+          {p.isSelf && <span className="participants__you"> (ви)</span>}
+          {p.isGuest && <span className="participants__by"> · гість</span>}
+          {p.userId !== p.addedByUserId && (
+            <span className="participants__by">
+              {' '}
+              · {genderVerb(p.addedByGender, 'додав', 'додала')} {p.addedByName}
+            </span>
+          )}
+        </span>
+        {p.primeWeekCount != null && (
+          <span
+            className={`participants__quota${
+              p.primeWeekCount >= PRIME_TIME_MAX_PER_WEEK
+                ? ' participants__quota--full'
+                : ''
+            }`}
+            title="Записи у прайм-тайм цього тижня"
+          >
+            {p.primeWeekCount}/{PRIME_TIME_MAX_PER_WEEK}
+          </span>
+        )}
+        {pairMode === 'pair' && (
+          <button
+            type="button"
+            className="participants__pair-btn"
+            aria-label="Об'єднати в пару"
+            disabled={actions.isPending}
+            onClick={() => actions.pair.mutate(p.id)}
+          >
+            🔗
+          </button>
+        )}
+        {pairMode === 'unpair' && (
+          <button
+            type="button"
+            className="participants__pair-btn participants__pair-btn--active"
+            aria-label="Прибрати з пари"
+            disabled={actions.isPending}
+            onClick={askUnpair}
+          >
+            🔗
+          </button>
+        )}
+        {p.canRemove && !ended && (
+          <button
+            type="button"
+            className="participants__remove"
+            aria-label="Прибрати"
+            disabled={actions.isPending}
+            onClick={() => askRemove(p.id, p.name, p.isSelf)}
+          >
+            ✕
+          </button>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="participants">
       <div className="participants__head">
@@ -254,53 +378,22 @@ export function ParticipantsPanel({
       {!isGroup && data && (
         <>
           <ul className="participants__list">
-            {data.participants.map((p) => (
-              <li key={p.id} className="participants__item">
-                <span className="participants__name">
-                  <PersonName
-                    name={p.name}
-                    gender={p.gender}
-                    isAdmin={p.isAdmin}
-                    isUser={p.userId != null}
-                    isRoot={p.isRoot}
-                  />
-                  {p.isSelf && <span className="participants__you"> (ви)</span>}
-                  {p.isGuest && (
-                    <span className="participants__by"> · гість</span>
-                  )}
-                  {p.userId !== p.addedByUserId && (
-                    <span className="participants__by">
-                      {' '}
-                      · {genderVerb(p.addedByGender, 'додав', 'додала')}{' '}
-                      {p.addedByName}
-                    </span>
-                  )}
-                </span>
-                {p.primeWeekCount != null && (
-                  <span
-                    className={`participants__quota${
-                      p.primeWeekCount >= PRIME_TIME_MAX_PER_WEEK
-                        ? ' participants__quota--full'
-                        : ''
-                    }`}
-                    title="Записи у прайм-тайм цього тижня"
-                  >
-                    {p.primeWeekCount}/{PRIME_TIME_MAX_PER_WEEK}
-                  </span>
-                )}
-                {p.canRemove && !ended && (
-                  <button
-                    type="button"
-                    className="participants__remove"
-                    aria-label="Прибрати"
-                    disabled={actions.isPending}
-                    onClick={() => askRemove(p.id, p.name, p.isSelf)}
-                  >
-                    ✕
-                  </button>
-                )}
-              </li>
-            ))}
+            {pairGroups.map((g) =>
+              g.kind === 'pair' ? (
+                <li key={g.members[0].id} className="participants__pair">
+                  <div className="participants__pair-tag">🔗 Пара</div>
+                  {g.members.map((m) => (
+                    <div key={m.id} className="participants__pair-row">
+                      {renderMember(m)}
+                    </div>
+                  ))}
+                </li>
+              ) : (
+                <li key={g.p.id} className="participants__item">
+                  {renderMember(g.p)}
+                </li>
+              ),
+            )}
             {data.participants.length === 0 && (
               <li className="participants__empty">Ще ніхто не записався</li>
             )}

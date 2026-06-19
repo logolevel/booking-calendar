@@ -136,6 +136,31 @@ export class ParticipationController {
       : this.participation.getDetails(eventId, user.id, role);
   }
 
+  @Post('participants/:participantId/pair')
+  async pair(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('eventId') eventId: string,
+    @Param('participantId') participantId: string,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
+  ): Promise<EventParticipantsResponse> {
+    const role = await this.resolveRole(user.id, preview);
+    await this.participation.pairWith(eventId, user.id, participantId);
+    this.gateway.emitEventUpdate(eventId);
+    return this.participation.getDetails(eventId, user.id, role);
+  }
+
+  @Delete('participants/pair/me')
+  async unpair(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('eventId') eventId: string,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
+  ): Promise<EventParticipantsResponse> {
+    const role = await this.resolveRole(user.id, preview);
+    await this.participation.unpair(eventId, user.id);
+    this.gateway.emitEventUpdate(eventId);
+    return this.participation.getDetails(eventId, user.id, role);
+  }
+
   @Post('waitlist')
   async joinWaitlist(
     @CurrentUser() user: VerifiedTelegramUser,

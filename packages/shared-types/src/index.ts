@@ -254,6 +254,8 @@ export interface ParticipantDto {
   addedByGender: Gender | null;
   isSelf: boolean;
   canRemove: boolean;
+  // Visual-only pairing: participants sharing the same pairId are a pair.
+  pairId: string | null;
   joinedAt: string;
   // Prime-time bookings this subject (user or guest) holds for the viewed
   // event's week. Shown against PRIME_TIME_MAX_PER_WEEK (e.g. "1/2").

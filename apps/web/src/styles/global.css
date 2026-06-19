@@ -749,6 +749,54 @@ button {
   opacity: 0.4;
 }
 
+.participants__pair-btn {
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.participants__pair-btn--active {
+  opacity: 1;
+}
+
+.participants__pair-btn:disabled {
+  opacity: 0.3;
+}
+
+/* A visually merged pair: a bordered block with both members inside. */
+.participants__pair {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  margin: 8px 0;
+}
+
+.participants__pair-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 4px;
+}
+
+.participants__pair-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.participants__pair-row + .participants__pair-row {
+  border-top: 1px dashed var(--border);
+}
+
 .participants__add {
   position: relative;
   margin-top: 12px;
