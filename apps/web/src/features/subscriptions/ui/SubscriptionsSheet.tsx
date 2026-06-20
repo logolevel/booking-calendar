@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import {
+  SUBSCRIPTION_ALLOWED_MONTHS,
   SUBSCRIPTION_DEFAULT_MONTHS,
-  SUBSCRIPTION_MAX_MONTHS,
-  SUBSCRIPTION_MIN_MONTHS,
   SUBSCRIPTION_SEASON_MONTHS,
   type SubscriptionDto,
 } from '@tg-calendar/shared-types';
@@ -21,10 +20,7 @@ interface Props {
   onClose: () => void;
 }
 
-const MONTH_OPTIONS = Array.from(
-  { length: SUBSCRIPTION_MAX_MONTHS - SUBSCRIPTION_MIN_MONTHS + 1 },
-  (_, i) => i + SUBSCRIPTION_MIN_MONTHS,
-);
+const MONTH_OPTIONS = SUBSCRIPTION_ALLOWED_MONTHS;
 
 const dateFmt = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv',
@@ -40,9 +36,7 @@ function formatRange(sub: SubscriptionDto): string {
 }
 
 function monthLabel(m: number): string {
-  return m === SUBSCRIPTION_SEASON_MONTHS
-    ? `Сезон (${m} міс.)`
-    : `${m} міс.`;
+  return m === SUBSCRIPTION_SEASON_MONTHS ? 'Сезон' : `${m} міс.`;
 }
 
 export function SubscriptionsSheet({ onClose }: Props): JSX.Element {
@@ -174,7 +168,8 @@ export function SubscriptionsSheet({ onClose }: Props): JSX.Element {
 
       <p className="field__hint">
         Власник активного абонемента має доступ до прайм-тайму в повному вікні
-        бронювання. Тижневий ліміт (2/тиждень, 1 зелений) діє для всіх.
+        бронювання. Тижневий ліміт (2/тиждень, 1 зелений) діє для всіх. Будь-який
+        абонемент діє лише до кінця сезону (кінець поточного року).
       </p>
 
       {isLoading && <p className="state__text">Завантаження…</p>}

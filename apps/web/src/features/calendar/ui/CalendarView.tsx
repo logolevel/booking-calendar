@@ -394,7 +394,7 @@ export function CalendarView({
         components={calendarComponents}
         dayPropGetter={dayPropGetter}
         slotPropGetter={slotPropGetter}
-        min={new Date(1970, 0, 1, 8, 0, 0)}
+        min={new Date(1970, 0, 1, 7, 0, 0)}
         max={new Date(1970, 0, 1, 23, 0, 0)}
         popup
         eventPropGetter={(event) =>

@@ -62,11 +62,21 @@ export const SUB_PRIME_TIME_DEFAULT_END = '20:30';
 // are not gated (full booking window); the weekly quota still applies to all.
 export const PRIME_TIME_MEMBER_OPEN_HOUR = 12;
 
-// Subscriptions are granted for a whole number of months (a season = 12).
-export const SUBSCRIPTION_MIN_MONTHS = 1;
-export const SUBSCRIPTION_MAX_MONTHS = 12;
+// Beach volleyball is seasonal: subscriptions run only within the current
+// season (until the end of the current calendar year). Plans are 1 month or
+// "season" (until year end). Every plan's end is capped to the season end, so
+// e.g. a season bought in early summer expires on Dec 31. Season is stored as
+// months = SUBSCRIPTION_SEASON_MONTHS (a plan sentinel; the real end comes from
+// the dates, not this number).
 export const SUBSCRIPTION_SEASON_MONTHS = 12;
 export const SUBSCRIPTION_DEFAULT_MONTHS = 1;
+// Fixed-duration preset offered alongside "season".
+export const SUBSCRIPTION_MONTH_PRESETS = [1] as const;
+// Every plan length the API accepts (the presets plus the season sentinel).
+export const SUBSCRIPTION_ALLOWED_MONTHS = [
+  ...SUBSCRIPTION_MONTH_PRESETS,
+  SUBSCRIPTION_SEASON_MONTHS,
+] as const;
 
 export interface TelegramUser {
   id: number;

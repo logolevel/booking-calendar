@@ -1,5 +1,5 @@
 // Calendar grid bounds and snapping for tap-to-create event drafts.
-export const DAY_START_HOUR = 8;
+export const DAY_START_HOUR = 7;
 export const DAY_END_HOUR = 23;
 export const STEP_MIN = 30;
 export const DEFAULT_DURATION_MIN = 120;

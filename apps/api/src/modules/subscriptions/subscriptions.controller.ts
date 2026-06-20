@@ -9,9 +9,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import type {
-  SubscriptionDto,
-  SubscriptionListResponse,
+import {
+  SUBSCRIPTION_SEASON_MONTHS,
+  type SubscriptionDto,
+  type SubscriptionListResponse,
 } from '@tg-calendar/shared-types';
 import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
@@ -47,9 +48,13 @@ export class SubscriptionsController {
   ): Promise<SubscriptionListResponse> {
     await this.assertAdmin(user.id);
     await this.subscriptions.create(dto.userId, dto.months, user.id, dto.note);
+    const plan =
+      dto.months === SUBSCRIPTION_SEASON_MONTHS
+        ? 'сезон'
+        : `${dto.months} міс`;
     await this.telegram.notifyUser(
       dto.userId,
-      `⭐ Вам активовано абонемент на ${dto.months} міс. Прайм-тайм доступний у повному вікні бронювання.`,
+      `⭐ Вам активовано абонемент на ${plan}. Прайм-тайм доступний у повному вікні бронювання.`,
     );
     return { subscriptions: await this.buildList() };
   }
