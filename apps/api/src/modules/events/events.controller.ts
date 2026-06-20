@@ -100,7 +100,9 @@ export class EventsController {
     const realRole = await this.requireAccess(user.id);
     // Admins previewing a non-admin role are subject to that role's limits.
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
-    return this.events.create(user.id, role, dto);
+    const created = await this.events.create(user.id, role, dto);
+    this.gateway.emitCalendarUpdate();
+    return created;
   }
 
   @Patch(':id')
@@ -113,6 +115,7 @@ export class EventsController {
     const realRole = await this.requireAccess(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     const updated = await this.events.update(id, user.id, role, dto);
+    // emitEventUpdate already refreshes open calendars too.
     this.gateway.emitEventUpdate(id);
     return updated;
   }
@@ -127,6 +130,7 @@ export class EventsController {
     const realRole = await this.requireAccess(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     await this.events.remove(id, user.id, role);
+    this.gateway.emitCalendarUpdate();
   }
 
   private async requireAccess(userId: number) {

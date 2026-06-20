@@ -116,6 +116,10 @@ export class EventsService {
     if (endsAt <= startsAt) {
       throw new BadRequestException('endsAt must be after startsAt');
     }
+    // Reject slots that already ended (applies to everyone, admins included):
+    // a past event never shows in the calendar yet would still consume the
+    // creator's prime-time weekly quota for that week.
+    this.assertNotEnded(endsAt);
 
     const isAdmin = role === Role.admin;
     const isGroup = dto.type === EVENT_TYPE.GROUP;

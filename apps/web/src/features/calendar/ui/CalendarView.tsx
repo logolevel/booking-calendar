@@ -34,6 +34,7 @@ import {
 } from '@tg-calendar/shared-types';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { useEvents } from '../useEvents';
+import { useCalendarRealtime } from '../useCalendarRealtime';
 import { toRbcEvent, draftRbcEvent, type RbcEvent } from '../model/rbcEvent';
 import {
   addStep,
@@ -167,6 +168,7 @@ export function CalendarView({
   initialEventId,
 }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
+  useCalendarRealtime();
   const [view, setView] = useState<View>(getDefaultView);
   const [date, setDate] = useState<Date>(new Date());
   const [formOpen, setFormOpen] = useState<boolean>(false);
@@ -307,6 +309,12 @@ export function CalendarView({
       end = addStep(start, DEFAULT_DURATION_STEPS);
     }
     end = clampEnd(start, end);
+    // Ignore slots that already ended: a past event never shows in the calendar
+    // and would still consume the creator's prime-time weekly quota. Enforced on
+    // the backend too; this just avoids opening a draft that would be rejected.
+    if (end <= new Date()) {
+      return;
+    }
     // Ignore taps a regular member cannot book yet, so they don't fill in a
     // draft only to be rejected by the backend access gate.
     if (subPrimeBlocked(start, end)) {
