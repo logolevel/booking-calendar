@@ -209,6 +209,16 @@ export function EventForm({
     (quota?.greenWeekCount ?? 0) >= PRIME_TIME_MAX_GREEN_PER_WEEK;
   const quotaBlocked = atPrimeLimit || atGreenLimit;
 
+  // The backend returns informative, localized reasons (overlap, date limit,
+  // prime-time gate/quota). Surface them directly for the expected 4xx codes;
+  // fall back to a generic line for anything else (e.g. network/5xx).
+  const serverError =
+    mutation.error instanceof ApiError &&
+    [400, 403, 409].includes(mutation.error.status) &&
+    mutation.error.message
+      ? mutation.error.message
+      : null;
+
   const errorMessage = primeBlocked
     ? 'Цей час у прайм-абонемент вікні поки недоступний. Він відкриється напередодні події (або одразу — з абонементом).'
     : atPrimeLimit
@@ -216,9 +226,7 @@ export function EventForm({
       : atGreenLimit
         ? 'На зелений майданчик у прайм-тайм можна записатися лише раз на тиждень. Оберіть червоний майданчик.'
         : mutation.isError
-          ? mutation.error instanceof ApiError && mutation.error.status === 409
-            ? 'Цей час на майданчику вже зайнятий. Оберіть інший час або майданчик.'
-            : 'Не вдалося зберегти подію (можливо, дата поза дозволеним діапазоном).'
+          ? serverError ?? 'Не вдалося зберегти подію. Спробуйте ще раз.'
           : null;
 
   const canSubmit =

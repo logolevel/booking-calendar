@@ -60,7 +60,7 @@ export class ParticipationService {
     `;
     const event = rows[0];
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException('Подію не знайдено.');
     }
     return event;
   }
@@ -68,7 +68,7 @@ export class ParticipationService {
   // A finished event is fully read-only: no joins, leaves, or roster edits.
   private assertActive(endsAt: Date): void {
     if (endsAt.getTime() <= Date.now()) {
-      throw new ForbiddenException('Event has already ended');
+      throw new ForbiddenException('Подія вже завершилася — зміни недоступні.');
     }
   }
 
@@ -230,7 +230,7 @@ export class ParticipationService {
       }
       const count = await tx.eventParticipant.count({ where: { eventId } });
       if (count >= event.capacity) {
-        throw new ConflictException('Event is full');
+        throw new ConflictException('Подія заповнена — вільних місць немає.');
       }
       await this.prime.assertAccess(tx, { userId: actorId }, role, event);
       await this.prime.assertQuota(tx, { userId: actorId }, event, eventId);
@@ -279,14 +279,14 @@ export class ParticipationService {
         where: { id: BigInt(targetUserId) },
       });
       if (!target) {
-        throw new BadRequestException('User not found');
+        throw new BadRequestException('Користувача не знайдено.');
       }
 
       const targetExisting = await tx.eventParticipant.findUnique({
         where: { eventId_userId: { eventId, userId: BigInt(targetUserId) } },
       });
       if (targetExisting) {
-        throw new ConflictException('User is already a participant');
+        throw new ConflictException('Цей користувач вже у списку учасників.');
       }
 
       if (role !== Role.admin) {
@@ -294,7 +294,9 @@ export class ParticipationService {
           where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
         });
         if (!actorParticipant) {
-          throw new ForbiddenException('Join the event before adding a guest');
+          throw new ForbiddenException(
+            'Спочатку запишіться на подію, щоб додавати інших учасників.',
+          );
         }
         if (!(await this.canAddUnlimited(role, actorId))) {
           const addedByActor = await tx.eventParticipant.count({
@@ -306,7 +308,7 @@ export class ParticipationService {
           });
           if (addedByActor >= 1) {
             throw new ForbiddenException(
-              'You can add only one extra participant',
+              'Без абонемента можна додати лише одного учасника. Оформіть абонемент, щоб додавати більше.',
             );
           }
         }
@@ -314,7 +316,7 @@ export class ParticipationService {
 
       const count = await tx.eventParticipant.count({ where: { eventId } });
       if (count >= event.capacity) {
-        throw new ConflictException('Event is full');
+        throw new ConflictException('Подія заповнена — вільних місць немає.');
       }
 
       // The access gate and quota apply to the person being booked.
@@ -367,7 +369,9 @@ export class ParticipationService {
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
       if (!actorParticipant) {
-        throw new ForbiddenException('Join the event before adding a guest');
+        throw new ForbiddenException(
+          'Спочатку запишіться на подію, щоб додавати інших учасників.',
+        );
       }
       if (!(await this.canAddUnlimited(role, actorId))) {
         const extras = await tx.eventParticipant.count({
@@ -378,13 +382,15 @@ export class ParticipationService {
           },
         });
         if (extras >= 1) {
-          throw new ForbiddenException('You can add only one extra participant');
+          throw new ForbiddenException(
+            'Без абонемента можна додати лише одного учасника. Оформіть абонемент, щоб додавати більше.',
+          );
         }
       }
     }
     const count = await tx.eventParticipant.count({ where: { eventId } });
     if (count >= capacity) {
-      throw new ConflictException('Event is full');
+      throw new ConflictException('Подія заповнена — вільних місць немає.');
     }
   }
 
@@ -400,13 +406,13 @@ export class ParticipationService {
       this.assertActive(event.endsAt);
       const guest = await tx.guest.findUnique({ where: { id: guestId } });
       if (!guest) {
-        throw new BadRequestException('Guest not found');
+        throw new BadRequestException('Гостя не знайдено.');
       }
       const existing = await tx.eventParticipant.findUnique({
         where: { eventId_guestId: { eventId, guestId } },
       });
       if (existing) {
-        throw new ConflictException('Guest is already a participant');
+        throw new ConflictException('Цей гість вже у списку учасників.');
       }
       await this.assertCanAddExtra(tx, eventId, actorId, role, event.capacity);
       // Guests carry no subscription: gated like a member without one.
@@ -491,7 +497,7 @@ export class ParticipationService {
         where: { id: participantId },
       });
       if (!participant || participant.eventId !== eventId) {
-        throw new NotFoundException('Participant not found');
+        throw new NotFoundException('Учасника не знайдено.');
       }
 
       const isSelf =
@@ -499,7 +505,9 @@ export class ParticipationService {
         participant.userId === BigInt(actorId);
       const isOwner = participant.addedByUserId === BigInt(actorId);
       if (role !== Role.admin && !isSelf && !isOwner) {
-        throw new ForbiddenException('You can remove only who you added');
+        throw new ForbiddenException(
+          'Ви можете видаляти лише тих, кого додали самі.',
+        );
       }
 
       const wasAuthor =
@@ -867,22 +875,24 @@ export class ParticipationService {
         where: { eventId_userId: { eventId, userId: BigInt(actorId) } },
       });
       if (!self) {
-        throw new ForbiddenException('Join the event to create a pair');
+        throw new ForbiddenException(
+          'Спочатку запишіться на подію, щоб створити пару.',
+        );
       }
       if (self.pairId) {
-        throw new ConflictException('You are already in a pair');
+        throw new ConflictException('Ви вже у парі.');
       }
       const target = await tx.eventParticipant.findUnique({
         where: { id: targetParticipantId },
       });
       if (!target || target.eventId !== eventId) {
-        throw new NotFoundException('Participant not found');
+        throw new NotFoundException('Учасника не знайдено.');
       }
       if (target.id === self.id) {
-        throw new BadRequestException('Cannot pair with yourself');
+        throw new BadRequestException('Не можна створити пару із собою.');
       }
       if (target.pairId) {
-        throw new ConflictException('Participant is already in a pair');
+        throw new ConflictException('Цей учасник вже у парі.');
       }
       const pairId = randomUUID();
       await tx.eventParticipant.updateMany({
@@ -1005,7 +1015,7 @@ export class ParticipationService {
   ): Promise<EventParticipantsResponse> {
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException('Подію не знайдено.');
     }
 
     const [participants, waitlist, logs, viewer] = await Promise.all([

@@ -202,7 +202,7 @@ export class ParticipationController {
   private async resolveRole(userId: number, preview?: string): Promise<Role> {
     const real = await this.access.resolveRole(userId);
     if (!real) {
-      throw new ForbiddenException('No access to this app');
+      throw new ForbiddenException('Немає доступу до застосунку.');
     }
     return this.access.applyPreview(real, preview) ?? real;
   }

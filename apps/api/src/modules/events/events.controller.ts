@@ -82,7 +82,7 @@ export class EventsController {
       Number.isNaN(end.getTime()) ||
       !Number.isInteger(resource)
     ) {
-      throw new BadRequestException('Invalid slot');
+      throw new BadRequestException('Некоректний час або майданчик.');
     }
     return this.events.primeQuotaPreview(user.id, {
       startsAt: start,
@@ -136,7 +136,7 @@ export class EventsController {
   private async requireAccess(userId: number) {
     const role = await this.access.resolveRole(userId);
     if (!role) {
-      throw new ForbiddenException('No access to this app');
+      throw new ForbiddenException('Немає доступу до застосунку.');
     }
     return role;
   }

@@ -29,7 +29,8 @@ type Db = Prisma.TransactionClient;
 const OVERLAP_CONSTRAINT = 'Event_no_overlap';
 // SQLSTATE raised by Postgres on an exclusion-constraint violation.
 const EXCLUSION_VIOLATION_SQLSTATE = '23P01';
-const OVERLAP_MESSAGE = 'This court is already booked for the selected time';
+const OVERLAP_MESSAGE =
+  'Цей час на майданчику вже зайнятий. Оберіть інший час або майданчик.';
 
 // UA labels for change notifications (until i18n is wired on the backend).
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -114,7 +115,9 @@ export class EventsService {
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
     if (endsAt <= startsAt) {
-      throw new BadRequestException('endsAt must be after startsAt');
+      throw new BadRequestException(
+        'Час завершення має бути пізніше за час початку.',
+      );
     }
     // Reject slots that already ended (applies to everyone, admins included):
     // a past event never shows in the calendar yet would still consume the
@@ -124,7 +127,9 @@ export class EventsService {
     const isAdmin = role === Role.admin;
     const isGroup = dto.type === EVENT_TYPE.GROUP;
     if (isGroup && !isAdmin) {
-      throw new ForbiddenException('Only an admin can create a group booking');
+      throw new ForbiddenException(
+        'Групове бронювання може створити лише адміністратор.',
+      );
     }
 
     if (!isAdmin) {
@@ -193,14 +198,16 @@ export class EventsService {
   ): Promise<EventDto> {
     const existing = await this.prisma.event.findUnique({ where: { id } });
     if (!existing) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException('Подію не знайдено.');
     }
     this.assertNotEnded(existing.endsAt);
 
     const isAdmin = role === Role.admin;
     const isAuthor = existing.createdBy === BigInt(userId);
     if (!isAdmin && !isAuthor) {
-      throw new ForbiddenException('Only the author or an admin can edit');
+      throw new ForbiddenException(
+        'Редагувати подію може лише її автор або адміністратор.',
+      );
     }
 
     // The author (non-admin) may change the capacity only; everything else
@@ -210,7 +217,7 @@ export class EventsService {
       const count = await this.countParticipants(id);
       if (dto.capacity < count) {
         throw new BadRequestException(
-          'Capacity cannot be below the current participant count',
+          'Ліміт не може бути меншим за поточну кількість учасників.',
         );
       }
       const event = await this.prisma.event.update({
@@ -233,7 +240,9 @@ export class EventsService {
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
     if (endsAt <= startsAt) {
-      throw new BadRequestException('endsAt must be after startsAt');
+      throw new BadRequestException(
+        'Час завершення має бути пізніше за час початку.',
+      );
     }
 
     const isGroup = dto.type === EVENT_TYPE.GROUP;
@@ -408,12 +417,14 @@ export class EventsService {
   async remove(id: string, userId: number, role: Role): Promise<void> {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException('Подію не знайдено.');
     }
     this.assertNotEnded(event.endsAt);
     const isAuthor = event.createdBy === BigInt(userId);
     if (role !== Role.admin && !isAuthor) {
-      throw new ForbiddenException('Only the author or an admin can delete');
+      throw new ForbiddenException(
+        'Видалити подію може лише її автор або адміністратор.',
+      );
     }
 
     // Capture cards/label before the row (and its cascade-deleted cards) vanish.
@@ -434,9 +445,10 @@ export class EventsService {
   }
 
   // A finished event is frozen: nobody (not even an admin) may edit or delete.
+  // Also guards creating a slot already in the past. The message fits both.
   private assertNotEnded(endsAt: Date): void {
     if (endsAt.getTime() <= Date.now()) {
-      throw new ForbiddenException('Event has already ended');
+      throw new ForbiddenException('Час події вже минув.');
     }
   }
 
@@ -509,9 +521,17 @@ export class EventsService {
       now.hour < openHour ? maxDaysAhead - 1 : maxDaysAhead;
     const maxDayIndex = now.dayIndex + effectiveDaysAhead;
 
-    if (target.dayIndex < now.dayIndex || target.dayIndex > maxDayIndex) {
+    if (target.dayIndex < now.dayIndex) {
+      throw new ForbiddenException('Не можна створювати події на минулі дати.');
+    }
+    if (target.dayIndex > maxDayIndex) {
+      const hh = String(openHour).padStart(2, '0');
+      const gatedToday =
+        now.hour < openHour && maxDayIndex === now.dayIndex + maxDaysAhead - 1;
       throw new ForbiddenException(
-        `Events are allowed only within the next ${maxDaysAhead} days`,
+        gatedToday
+          ? `Записуватися можна не далі ніж на ${maxDaysAhead} дн. наперед. Найдальший день відкриється сьогодні о ${hh}:00.`
+          : `Записуватися можна не далі ніж на ${maxDaysAhead} дн. наперед.`,
       );
     }
   }
