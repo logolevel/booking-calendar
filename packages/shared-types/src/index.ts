@@ -32,7 +32,7 @@ export type ResourceId = (typeof RESOURCE_IDS)[number];
 // The green court (🟢 №1). Its prime-time weekly sub-limit is stricter.
 export const GREEN_RESOURCE_ID = 1;
 
-export const MIN_CAPACITY = 2;
+export const MIN_CAPACITY = 1;
 export const MAX_CAPACITY = 8;
 export const DEFAULT_CAPACITY = 6;
 

@@ -19,6 +19,7 @@ import { UsersService } from '../users/users.service';
 import { GuestsService } from '../guests/guests.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrimeTimeService } from '../prime-time/prime-time.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { EventNotificationsService } from '../notifications/event-notifications.service';
 
 type Tx = Prisma.TransactionClient;
@@ -40,8 +41,15 @@ export class ParticipationService {
     private readonly users: UsersService,
     private readonly guests: GuestsService,
     private readonly prime: PrimeTimeService,
+    private readonly subscriptions: SubscriptionsService,
     private readonly notifications: EventNotificationsService,
   ) {}
+
+  // Admins and active subscribers may add unlimited extra participants/guests;
+  // a regular member must be in the event and is capped at one extra.
+  private async canAddUnlimited(role: Role, actorId: number): Promise<boolean> {
+    return role === Role.admin || this.subscriptions.isActive(actorId);
+  }
 
   // Lock the event row for the duration of the transaction to avoid two
   // clients grabbing the last seat at the same time.
@@ -288,15 +296,19 @@ export class ParticipationService {
         if (!actorParticipant) {
           throw new ForbiddenException('Join the event before adding a guest');
         }
-        const addedByActor = await tx.eventParticipant.count({
-          where: {
-            eventId,
-            addedByUserId: BigInt(actorId),
-            userId: { not: BigInt(actorId) },
-          },
-        });
-        if (addedByActor >= 1) {
-          throw new ForbiddenException('You can add only one extra participant');
+        if (!(await this.canAddUnlimited(role, actorId))) {
+          const addedByActor = await tx.eventParticipant.count({
+            where: {
+              eventId,
+              addedByUserId: BigInt(actorId),
+              userId: { not: BigInt(actorId) },
+            },
+          });
+          if (addedByActor >= 1) {
+            throw new ForbiddenException(
+              'You can add only one extra participant',
+            );
+          }
         }
       }
 
@@ -340,8 +352,9 @@ export class ParticipationService {
     });
   }
 
-  // Shared "+1" rule: non-admins must already be in and may add one extra
-  // (a directory user or a guest); everyone is bound by the capacity.
+  // Shared add-extra rule: non-admins must already be in the event. Admins and
+  // active subscribers may add unlimited extras; a regular member may add only
+  // one (a directory user or a guest). Everyone is bound by the capacity.
   private async assertCanAddExtra(
     tx: Tx,
     eventId: string,
@@ -356,15 +369,17 @@ export class ParticipationService {
       if (!actorParticipant) {
         throw new ForbiddenException('Join the event before adding a guest');
       }
-      const extras = await tx.eventParticipant.count({
-        where: {
-          eventId,
-          addedByUserId: BigInt(actorId),
-          OR: [{ userId: null }, { userId: { not: BigInt(actorId) } }],
-        },
-      });
-      if (extras >= 1) {
-        throw new ForbiddenException('You can add only one extra participant');
+      if (!(await this.canAddUnlimited(role, actorId))) {
+        const extras = await tx.eventParticipant.count({
+          where: {
+            eventId,
+            addedByUserId: BigInt(actorId),
+            OR: [{ userId: null }, { userId: { not: BigInt(actorId) } }],
+          },
+        });
+        if (extras >= 1) {
+          throw new ForbiddenException('You can add only one extra participant');
+        }
       }
     }
     const count = await tx.eventParticipant.count({ where: { eventId } });
@@ -1031,15 +1046,17 @@ export class ParticipationService {
     const participantGuestIds = participants
       .filter((p) => p.guestId != null)
       .map((p) => p.guestId as string);
-    const [profiles, guestProfiles, primeCounts] = await Promise.all([
-      this.users.getProfileMap(ids),
-      this.guests.getMap(guestIds),
-      this.prime.countPrimeWeekForSubjects(
-        this.prisma,
-        { userIds: participantUserIds, guestIds: participantGuestIds },
-        event,
-      ),
-    ]);
+    const [profiles, guestProfiles, primeCounts, actorUnlimited] =
+      await Promise.all([
+        this.users.getProfileMap(ids),
+        this.guests.getMap(guestIds),
+        this.prime.countPrimeWeekForSubjects(
+          this.prisma,
+          { userIds: participantUserIds, guestIds: participantGuestIds },
+          event,
+        ),
+        this.canAddUnlimited(role, actorId),
+      ]);
     const nameOf = (id: number): string =>
       profiles.get(id)?.name ?? 'Користувач';
 
@@ -1054,7 +1071,9 @@ export class ParticipationService {
     ).length;
     const isFull = count >= event.capacity;
     const canAddPlusOne =
-      !isFull && (role === Role.admin || (isParticipant && addedByActor < 1));
+      !isFull &&
+      (role === Role.admin ||
+        (isParticipant && (actorUnlimited || addedByActor < 1)));
 
     return {
       eventId,

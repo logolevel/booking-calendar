@@ -3,6 +3,7 @@ import { AccessModule } from '../access/access.module';
 import { UsersModule } from '../users/users.module';
 import { GuestsModule } from '../guests/guests.module';
 import { PrimeTimeModule } from '../prime-time/prime-time.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { EventNotificationsModule } from '../notifications/event-notifications.module';
 import { EventsGateway } from '../realtime/events.gateway';
 import { ParticipationController } from './participation.controller';
@@ -14,6 +15,7 @@ import { ParticipationService } from './participation.service';
     UsersModule,
     GuestsModule,
     PrimeTimeModule,
+    SubscriptionsModule,
     EventNotificationsModule,
   ],
   controllers: [ParticipationController],

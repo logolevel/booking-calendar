@@ -216,7 +216,7 @@ export class AdminController {
     if (next.primeMemberOpenHour !== prev.primeMemberOpenHour) {
       const hh = String(next.primeMemberOpenHour).padStart(2, '0');
       await this.telegram.broadcastToUsers(
-        `⏳ Прайм-тайм для учасників тепер відкривається о ${hh}:00 напередодні події (абонемент — без обмежень).`,
+        `⏳ Прайм-тайм для учасників(без абонемента) тепер відкривається о ${hh}:00 напередодні події (абонемент — без обмежень).`,
       );
     }
   }
