@@ -193,8 +193,10 @@ export function SubscriptionsSheet({ onClose }: Props): JSX.Element {
                     <PersonName
                       name={s.userName}
                       gender={s.gender}
-                      isAdmin={false}
+                      isAdmin={s.isAdmin}
                       isUser
+                      isRoot={s.isRoot}
+                      isSubscriber={s.isSubscriber}
                     />
                     <span className="subs__meta">
                       {formatRange(s)} · {monthLabel(s.months)}

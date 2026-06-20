@@ -79,6 +79,13 @@ export class SubscriptionsController {
     }
     const profiles = await this.users.getProfileMap([...ids]);
     const now = Date.now();
+    // A user counts as a current subscriber if any of their rows is active now.
+    const activeUserIds = new Set<number>();
+    for (const r of rows) {
+      if (r.startsAt.getTime() <= now && r.endsAt.getTime() >= now) {
+        activeUserIds.add(Number(r.userId));
+      }
+    }
     return rows.map((r) => {
       const userId = Number(r.userId);
       const createdBy = Number(r.createdBy);
@@ -88,6 +95,9 @@ export class SubscriptionsController {
         userId,
         userName: profile?.name ?? 'Користувач',
         gender: profile?.gender ?? null,
+        isAdmin: profile?.isAdmin ?? false,
+        isRoot: this.access.isRoot(userId),
+        isSubscriber: activeUserIds.has(userId),
         startsAt: r.startsAt.toISOString(),
         endsAt: r.endsAt.toISOString(),
         months: r.months,

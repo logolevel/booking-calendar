@@ -485,7 +485,7 @@ export function ParticipantsPanel({
                 disabled={actions.reminder.isPending}
                 onChange={(e) => actions.reminder.mutate(e.target.checked)}
               />
-              Нагадати мені за 1 годину
+              Нагадати мені за 1 годину до події
             </label>
           )}
 

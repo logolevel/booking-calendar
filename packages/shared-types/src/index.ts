@@ -349,6 +349,11 @@ export interface SubscriptionDto {
   userId: number;
   userName: string;
   gender: Gender | null;
+  // Current status of the owner, for the name badge (kept in sync with the
+  // directory): admin 👑 / root ❄️ / active-subscriber ⭐.
+  isAdmin: boolean;
+  isRoot: boolean;
+  isSubscriber: boolean;
   startsAt: string;
   endsAt: string;
   months: number;
