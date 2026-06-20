@@ -42,12 +42,12 @@ export interface EventChangeNotice {
 
 // UA labels for event cards/notifications (until i18n is wired on the backend).
 const EVENT_TYPE_LABELS: Record<string, string> = {
-  women: 'Жінки',
-  men: 'Чоловіки',
+  women: 'Жінки (ігрове)',
+  men: 'Чоловіки (ігрове)',
   mixed: 'Мікст',
   individual: 'Індивідуальне',
-  tech_women: 'Технічка (жінки)',
-  tech_men: 'Технічка (чоловіки)',
+  tech_women: 'Жінки (технічка)',
+  tech_men: 'Чоловіки (технічка)',
   group: 'Група',
 };
 
