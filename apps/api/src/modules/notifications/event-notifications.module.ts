@@ -5,6 +5,7 @@ import { GuestsModule } from '../guests/guests.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { EventNotificationsService } from './event-notifications.service';
+import { NotificationPrefsService } from './notification-prefs.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { EventNotificationsService } from './event-notifications.service';
     SubscriptionsModule,
     TelegramModule,
   ],
-  providers: [EventNotificationsService],
-  exports: [EventNotificationsService],
+  providers: [EventNotificationsService, NotificationPrefsService],
+  exports: [EventNotificationsService, NotificationPrefsService],
 })
 export class EventNotificationsModule {}

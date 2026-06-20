@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import {
+  NOTIFICATION_CATEGORY,
+  type NotificationCategory,
+} from '@tg-calendar/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from '../access/access.service';
 import { UsersService } from '../users/users.service';
 import { GuestsService } from '../guests/guests.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { NotificationPrefsService } from './notification-prefs.service';
 
 export interface UserDisplay {
   text: string;
@@ -20,6 +25,10 @@ export interface Tracker {
 // text plus optional per-user overrides, extra recipients and departing users.
 export interface EventChangeNotice {
   actorId: number;
+  // Which category this notice belongs to; admins who opted out of it (and are
+  // not participants) are not notified. Defaults to ROSTER (the common case:
+  // join/add/leave/remove/queue); set explicitly to OTHER for edits/pairing.
+  category?: NotificationCategory;
   // Default reply text (already HTML-safe) for the general audience.
   text: string;
   // Per-user override reply text (HTML-safe), e.g. the added/removed person.
@@ -60,6 +69,7 @@ export class EventNotificationsService {
     private readonly guests: GuestsService,
     private readonly subscriptions: SubscriptionsService,
     private readonly telegram: TelegramService,
+    private readonly prefs: NotificationPrefsService,
   ) {}
 
   // Human-readable one-line event label (court time zone), used in replies and
@@ -228,11 +238,10 @@ export class EventNotificationsService {
     }).format(date);
   }
 
-  // Users that should keep a live card for this event: every admin plus the
-  // current participants and waitlist (registered users only; guests have no
-  // bot chat). The card itself never lists the waitlist.
-  async cardRecipients(eventId: string): Promise<number[]> {
-    const [participants, waitlist, adminIds] = await Promise.all([
+  // Registered users directly involved in the event (participants + waitlist).
+  // They always receive cards/notices regardless of admin notification opt-ins.
+  private async involvedUserIds(eventId: string): Promise<number[]> {
+    const [participants, waitlist] = await Promise.all([
       this.prisma.eventParticipant.findMany({
         where: { eventId, userId: { not: null } },
         select: { userId: true },
@@ -241,9 +250,8 @@ export class EventNotificationsService {
         where: { eventId },
         select: { userId: true },
       }),
-      this.access.listAdminIds(),
     ]);
-    const ids = new Set<number>(adminIds);
+    const ids = new Set<number>();
     for (const p of participants) {
       if (p.userId != null) {
         ids.add(Number(p.userId));
@@ -251,6 +259,30 @@ export class EventNotificationsService {
     }
     for (const w of waitlist) {
       ids.add(Number(w.userId));
+    }
+    return [...ids];
+  }
+
+  // Users that should keep a live card for this event: the current participants
+  // and waitlist (registered users only; guests have no bot chat) plus the
+  // admins who opted in to the given category. The card itself never lists the
+  // waitlist. A null category includes every admin (used for plain refreshes).
+  async cardRecipients(
+    eventId: string,
+    category: NotificationCategory | null,
+  ): Promise<number[]> {
+    const [involved, adminIds] = await Promise.all([
+      this.involvedUserIds(eventId),
+      this.access.listAdminIds(),
+    ]);
+    const ids = new Set<number>(involved);
+    const monitoringAdmins = adminIds.filter((id) => !ids.has(id));
+    const allowed =
+      category == null
+        ? monitoringAdmins
+        : await this.prefs.filterByCategory(monitoringAdmins, category);
+    for (const id of allowed) {
+      ids.add(id);
     }
     return [...ids];
   }
@@ -321,7 +353,9 @@ export class EventNotificationsService {
   async pushCreated(eventId: string, actorId: number): Promise<void> {
     const cardText = await this.card(eventId);
     const link = await this.telegram.eventDeepLink(eventId);
-    const recipients = new Set<number>(await this.cardRecipients(eventId));
+    const recipients = new Set<number>(
+      await this.cardRecipients(eventId, NOTIFICATION_CATEGORY.CREATE_DELETE),
+    );
     recipients.add(actorId);
     for (const userId of recipients) {
       await this.ensureCard(eventId, userId, cardText, link);
@@ -338,7 +372,10 @@ export class EventNotificationsService {
     const cardText = await this.card(eventId);
     const link = await this.telegram.eventDeepLink(eventId);
 
-    const recipients = new Set<number>(await this.cardRecipients(eventId));
+    const category = notice.category ?? NOTIFICATION_CATEGORY.ROSTER;
+    const recipients = new Set<number>(
+      await this.cardRecipients(eventId, category),
+    );
     recipients.add(notice.actorId);
     for (const id of notice.include ?? []) {
       recipients.add(id);
@@ -370,24 +407,40 @@ export class EventNotificationsService {
   // notified once the row (and its cascade-deleted cards) are gone.
   async cancelSnapshot(
     eventId: string,
-  ): Promise<{ trackers: Tracker[]; label: string }> {
-    const [trackers, label] = await Promise.all([
+  ): Promise<{ trackers: Tracker[]; label: string; involved: number[] }> {
+    const [trackers, label, involved] = await Promise.all([
       this.trackers(eventId),
       this.label(eventId),
+      this.involvedUserIds(eventId),
     ]);
-    return { trackers, label };
+    return { trackers, label, involved };
   }
 
   // Mark each captured main card as cancelled (no link) and reply with the
-  // cancellation notice. Use the snapshot taken before deletion.
+  // cancellation notice. Use the snapshot taken before deletion. Cancellation
+  // is a CREATE_DELETE notice: admins who opted out of that category (and were
+  // not participants) are skipped.
   async pushCancelled(
-    snapshot: { trackers: Tracker[]; label: string },
+    snapshot: { trackers: Tracker[]; label: string; involved: number[] },
     text: string,
   ): Promise<void> {
     const cancelled = `${TelegramService.escapeHtml(
       snapshot.label,
     )}\n\n❌ <b>Подію скасовано</b>`;
+    const involved = new Set<number>(snapshot.involved);
+    const monitoring = snapshot.trackers
+      .map((t) => t.userId)
+      .filter((id) => !involved.has(id));
+    const allowed = new Set<number>(
+      await this.prefs.filterByCategory(
+        monitoring,
+        NOTIFICATION_CATEGORY.CREATE_DELETE,
+      ),
+    );
     for (const t of snapshot.trackers) {
+      if (!involved.has(t.userId) && !allowed.has(t.userId)) {
+        continue;
+      }
       await this.telegram.editEventCard(t.userId, t.messageId, cancelled);
       await this.telegram.replyMessage(t.userId, text, t.messageId);
     }

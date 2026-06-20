@@ -11,17 +11,19 @@ interface Props {
   onUsers: () => void;
   onSubs: () => void;
   onAdmins: () => void;
+  onNotifications: () => void;
   onSettings: () => void;
   onClose: () => void;
 }
 
 const ITEMS: { icon: string; label: string; key: keyof Pick<
   Props,
-  'onUsers' | 'onSubs' | 'onAdmins' | 'onSettings'
+  'onUsers' | 'onSubs' | 'onAdmins' | 'onNotifications' | 'onSettings'
 > }[] = [
   { icon: '👥', label: 'Користувачі', key: 'onUsers' },
   { icon: '⭐', label: 'Абонементи', key: 'onSubs' },
   { icon: '👑', label: 'Адміністратори', key: 'onAdmins' },
+  { icon: '🔔', label: 'Сповіщення', key: 'onNotifications' },
   { icon: '⚙️', label: 'Налаштування', key: 'onSettings' },
 ];
 

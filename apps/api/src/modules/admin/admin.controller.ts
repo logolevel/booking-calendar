@@ -13,6 +13,7 @@ import {
 import { Role } from '@prisma/client';
 import type {
   AdminListResponse,
+  AdminNotificationSettingsResponse,
   AdminSettingsResponse,
 } from '@tg-calendar/shared-types';
 import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
@@ -22,8 +23,10 @@ import { AccessService } from '../access/access.service';
 import { SettingsService } from '../settings/settings.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { UsersService } from '../users/users.service';
+import { NotificationPrefsService } from '../notifications/notification-prefs.service';
 import { GrantAdminDto } from './dto/grant-admin.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
+import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
 @Controller('api/admin')
 @UseGuards(TelegramAuthGuard)
@@ -33,6 +36,7 @@ export class AdminController {
     private readonly settings: SettingsService,
     private readonly telegram: TelegramService,
     private readonly users: UsersService,
+    private readonly notificationPrefs: NotificationPrefsService,
   ) {}
 
   @Get('admins')
@@ -149,6 +153,27 @@ export class AdminController {
       await this.notifyChanges(prev, next);
     }
     return next;
+  }
+
+  @Get('notifications')
+  async getNotifications(
+    @CurrentUser() user: VerifiedTelegramUser,
+  ): Promise<AdminNotificationSettingsResponse> {
+    await this.assertAdmin(user.id);
+    return this.notificationPrefs.get(user.id);
+  }
+
+  @Patch('notifications')
+  async updateNotifications(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Body() dto: UpdateNotificationsDto,
+  ): Promise<AdminNotificationSettingsResponse> {
+    await this.assertAdmin(user.id);
+    return this.notificationPrefs.set(user.id, {
+      createDelete: dto.createDelete,
+      roster: dto.roster,
+      other: dto.other,
+    });
   }
 
   private toMinutes(hhmm: string): number {

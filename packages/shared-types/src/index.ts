@@ -142,6 +142,33 @@ export interface AdminSettingsResponse {
   primeMemberOpenHour: number;
 }
 
+// Categories an admin can opt in/out of for event bot notifications. Each
+// event notice is tagged with exactly one category; an admin only receives
+// notices for categories they enabled (applies to "monitoring" notices — an
+// admin who is a participant of the event is always notified).
+export const NOTIFICATION_CATEGORY = {
+  // Event created / cancelled (deleted).
+  CREATE_DELETE: 'createDelete',
+  // Roster changes: join/add/leave/remove, queue, promotion.
+  ROSTER: 'roster',
+  // Everything else: event edits, pairing/unpairing.
+  OTHER: 'other',
+} as const;
+
+export type NotificationCategory =
+  (typeof NOTIFICATION_CATEGORY)[keyof typeof NOTIFICATION_CATEGORY];
+
+// Per-admin toggle of which notification categories to receive. "Усі" (all) is
+// derived on the client = every flag true.
+export interface AdminNotificationSettingsResponse {
+  createDelete: boolean;
+  roster: boolean;
+  other: boolean;
+}
+
+export type UpdateAdminNotificationSettingsRequest =
+  AdminNotificationSettingsResponse;
+
 export interface UpdateAdminSettingsRequest {
   maxDaysAhead: number;
   bookingOpenHour: number;

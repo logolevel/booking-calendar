@@ -8,6 +8,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { Prisma, Role } from '@prisma/client';
 import {
+  NOTIFICATION_CATEGORY,
   PARTICIPATION_ACTION,
   type EventParticipantsResponse,
   type ParticipationAction,
@@ -895,6 +896,7 @@ export class ParticipationService {
     }
     await this.notifications.pushChange(eventId, {
       actorId,
+      category: NOTIFICATION_CATEGORY.OTHER,
       text: `${actor.text} та ${mate.text} — команда 🔗`,
       overrides,
     });
@@ -941,6 +943,7 @@ export class ParticipationService {
     }
     await this.notifications.pushChange(eventId, {
       actorId,
+      category: NOTIFICATION_CATEGORY.OTHER,
       text: `Пару розформовано: ${actor.text} та ${mate.text}`,
       overrides,
     });

@@ -8,6 +8,7 @@ import { OnboardingForm } from './features/onboarding/ui/OnboardingForm';
 import { SettingsSheet } from './features/admin/ui/SettingsSheet';
 import { AdminsSheet } from './features/admin/ui/AdminsSheet';
 import { AdminMenuSheet } from './features/admin/ui/AdminMenuSheet';
+import { NotificationsSheet } from './features/admin/ui/NotificationsSheet';
 import { SubscriptionsSheet } from './features/subscriptions/ui/SubscriptionsSheet';
 import { UsersSheet } from './features/directory/ui/UsersSheet';
 import { getStartEventId } from './shared/telegram/startParam';
@@ -49,6 +50,7 @@ export function App(): JSX.Element {
   const [adminsOpen, setAdminsOpen] = useState(false);
   const [subsOpen, setSubsOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [initialEventId] = useState<string | null>(() => getStartEventId());
 
   if (isLoading) {
@@ -120,6 +122,7 @@ export function App(): JSX.Element {
           onUsers={() => setUsersOpen(true)}
           onSubs={() => setSubsOpen(true)}
           onAdmins={() => setAdminsOpen(true)}
+          onNotifications={() => setNotificationsOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onClose={() => setMenuOpen(false)}
         />
@@ -128,6 +131,9 @@ export function App(): JSX.Element {
       {adminsOpen && <AdminsSheet onClose={() => setAdminsOpen(false)} />}
       {subsOpen && <SubscriptionsSheet onClose={() => setSubsOpen(false)} />}
       {usersOpen && <UsersSheet onClose={() => setUsersOpen(false)} />}
+      {notificationsOpen && (
+        <NotificationsSheet onClose={() => setNotificationsOpen(false)} />
+      )}
       <main className="app__main">
         {isPreviewing && (
           <div className="preview-bar">

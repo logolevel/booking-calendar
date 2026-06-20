@@ -8,6 +8,7 @@ import {
 import { Prisma, Role } from '@prisma/client';
 import {
   EVENT_TYPE,
+  NOTIFICATION_CATEGORY,
   PARTICIPATION_ACTION,
   type EventDto,
   type PrimeQuotaPreviewResponse,
@@ -390,6 +391,7 @@ export class EventsService {
       .join('\n');
     await this.notifications.pushChange(eventId, {
       actorId,
+      category: NOTIFICATION_CATEGORY.OTHER,
       text: `${actor.text} ${verb} подію:\n${details}`,
     });
   }
