@@ -38,6 +38,9 @@ model User {
   role        Role      @default(member)
   // Admins assigned from the Mini App by other admins (root stays in ADMIN_ID).
   isAdmin     Boolean   @default(false)
+  // Sticky personal preference: when true, the bot reminds this user one hour
+  // before every event they take part in. Toggled from any event's panel.
+  remindBeforeEvent Boolean @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   events      Event[]
@@ -98,6 +101,7 @@ model Event {
   waitlist     EventWaitlist[]
   logs         EventParticipationLog[]
   chatMessages EventChatMessage[]
+  reminders    EventReminder[]
 
   // A Postgres EXCLUDE constraint ("Event_no_overlap") forbids two events on the
   // same resourceId from overlapping in time. It cannot be expressed in Prisma
@@ -177,6 +181,19 @@ model EventChatMessage {
   messageId Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+// One row per reminder already dispatched, so the scheduler never sends the
+// one-hour reminder twice (also survives restarts/multiple instances).
+model EventReminder {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    BigInt
+  sentAt    DateTime @default(now())
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])

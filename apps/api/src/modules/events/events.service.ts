@@ -34,10 +34,10 @@ const OVERLAP_MESSAGE = 'This court is already booked for the selected time';
 const EVENT_TYPE_LABELS: Record<string, string> = {
   women: 'Жінки',
   men: 'Чоловіки',
-  mixed: 'Мікс',
+  mixed: 'Мікст',
   individual: 'Індивідуальне',
-  tech_women: 'Техніка (жінки)',
-  tech_men: 'Техніка (чоловіки)',
+  tech_women: 'Технічка (жінки)',
+  tech_men: 'Технічка (чоловіки)',
   group: 'Група',
 };
 

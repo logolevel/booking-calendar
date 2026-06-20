@@ -96,10 +96,24 @@ export class ParticipationService {
       isAdmin: role === Role.admin,
       isAuthor: false,
       canAddPlusOne: false,
+      remindBeforeEvent: false,
       participants: [],
       waitlist: [],
       log: [],
     };
+  }
+
+  // Toggle the user's sticky "remind me one hour before" preference. It is
+  // global (applies to every event they take part in), so future events default
+  // to the last value the user set.
+  async setReminderPreference(
+    userId: number,
+    enabled: boolean,
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: BigInt(userId) },
+      data: { remindBeforeEvent: enabled },
+    });
   }
 
   // When the author leaves, hand authorship to the earliest-joined user
@@ -881,7 +895,7 @@ export class ParticipationService {
     }
     await this.notifications.pushChange(eventId, {
       actorId,
-      text: `${actor.text} та ${mate.text} — пара 🔗`,
+      text: `${actor.text} та ${mate.text} — команда 🔗`,
       overrides,
     });
   }
@@ -976,7 +990,7 @@ export class ParticipationService {
       throw new NotFoundException('Event not found');
     }
 
-    const [participants, waitlist, logs] = await Promise.all([
+    const [participants, waitlist, logs, viewer] = await Promise.all([
       this.prisma.eventParticipant.findMany({
         where: { eventId },
         orderBy: { joinedAt: 'asc' },
@@ -989,6 +1003,10 @@ export class ParticipationService {
         where: { eventId },
         orderBy: { at: 'desc' },
         take: 50,
+      }),
+      this.prisma.user.findUnique({
+        where: { id: BigInt(actorId) },
+        select: { remindBeforeEvent: true },
       }),
     ]);
 
@@ -1045,6 +1063,7 @@ export class ParticipationService {
       isAdmin: role === Role.admin,
       isAuthor: event.createdBy === actor,
       canAddPlusOne,
+      remindBeforeEvent: viewer?.remindBeforeEvent ?? false,
       participants: participants.map((p) => {
         const isSelf = p.userId != null && p.userId === actor;
         const profile =

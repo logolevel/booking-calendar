@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthController } from './health/health.controller';
@@ -13,10 +14,12 @@ import { ParticipationModule } from './modules/participation/participation.modul
 import { AdminModule } from './modules/admin/admin.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { DirectoryModule } from './modules/directory/directory.module';
+import { RemindersModule } from './modules/reminders/reminders.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', '..', 'web', 'dist'),
       exclude: ['/api*', '/calendar-webhook*'],
@@ -31,6 +34,7 @@ import { DirectoryModule } from './modules/directory/directory.module';
     AdminModule,
     SubscriptionsModule,
     DirectoryModule,
+    RemindersModule,
   ],
   controllers: [HealthController],
 })

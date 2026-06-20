@@ -304,9 +304,16 @@ export interface EventParticipantsResponse {
   isAuthor: boolean;
   // True when the viewer may add an extra right now (quota free, not full).
   canAddPlusOne: boolean;
+  // The viewer's sticky preference to be reminded one hour before events they
+  // take part in. Global per user; reflected here for the panel's checkbox.
+  remindBeforeEvent: boolean;
   participants: ParticipantDto[];
   waitlist: WaitlistEntryDto[];
   log: ParticipationLogDto[];
+}
+
+export interface SetReminderRequest {
+  enabled: boolean;
 }
 
 export interface AddParticipantRequest {

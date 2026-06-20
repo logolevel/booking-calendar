@@ -408,7 +408,7 @@ export function ParticipantsPanel({
             {pairGroups.map((g) =>
               g.kind === 'pair' ? (
                 <li key={g.members[0].id} className="participants__pair">
-                  <div className="participants__pair-tag">🔗 Пара</div>
+                  <div className="participants__pair-tag">🔗 Команда</div>
                   {g.members.map((m) => (
                     <div key={m.id} className="participants__pair-row">
                       {renderMember(m)}
@@ -475,6 +475,18 @@ export function ParticipantsPanel({
               existingGuestIds={existingGuestIds}
               disabled={!data.canAddPlusOne}
             />
+          )}
+
+          {!ended && data.isParticipant && (
+            <label className="participants__checkbox">
+              <input
+                type="checkbox"
+                checked={data.remindBeforeEvent}
+                disabled={actions.reminder.isPending}
+                onChange={(e) => actions.reminder.mutate(e.target.checked)}
+              />
+              Нагадати мені за 1 годину
+            </label>
           )}
 
           {data.waitlist.length > 0 && (

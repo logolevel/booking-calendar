@@ -16,6 +16,7 @@ import {
   removeParticipant,
   searchGuests,
   searchUsers,
+  setReminder,
   unpairSelf,
 } from './api';
 
@@ -76,6 +77,10 @@ export function useParticipationActions(eventId: string) {
     mutationFn: () => unpairSelf(eventId),
     onSuccess,
   });
+  const reminder = useMutation({
+    mutationFn: (enabled: boolean) => setReminder(eventId, enabled),
+    onSuccess,
+  });
 
   const isPending =
     join.isPending ||
@@ -114,6 +119,7 @@ export function useParticipationActions(eventId: string) {
     unqueue,
     pair,
     unpair,
+    reminder,
     isPending,
     error,
   };

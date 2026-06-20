@@ -7,6 +7,7 @@ import type {
 import {
   apiDelete,
   apiGet,
+  apiPatch,
   apiPost,
 } from '../../shared/api/client';
 
@@ -82,6 +83,16 @@ export function leaveWaitlist(
 ): Promise<EventParticipantsResponse> {
   return apiDelete<EventParticipantsResponse>(
     `/api/events/${eventId}/waitlist/me`,
+  );
+}
+
+export function setReminder(
+  eventId: string,
+  enabled: boolean,
+): Promise<EventParticipantsResponse> {
+  return apiPatch<EventParticipantsResponse>(
+    `/api/events/${eventId}/reminder`,
+    { enabled },
   );
 }
 

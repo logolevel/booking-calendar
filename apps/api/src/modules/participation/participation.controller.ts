@@ -6,6 +6,7 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import { EventsGateway } from '../realtime/events.gateway';
 import { ParticipationService } from './participation.service';
 import { AddParticipantDto } from './dto/add-participant.dto';
 import { AddExistingGuestDto, CreateGuestDto } from './dto/add-guest.dto';
+import { SetReminderDto } from './dto/set-reminder.dto';
 
 @Controller('api/events/:eventId')
 @UseGuards(TelegramAuthGuard)
@@ -182,6 +184,18 @@ export class ParticipationController {
     const role = await this.resolveRole(user.id, preview);
     await this.participation.leaveWaitlist(eventId, user.id);
     this.gateway.emitEventUpdate(eventId);
+    return this.participation.getDetails(eventId, user.id, role);
+  }
+
+  @Patch('reminder')
+  async setReminder(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('eventId') eventId: string,
+    @Body() dto: SetReminderDto,
+    @Headers(PREVIEW_ROLE_HEADER) preview?: string,
+  ): Promise<EventParticipantsResponse> {
+    const role = await this.resolveRole(user.id, preview);
+    await this.participation.setReminderPreference(user.id, dto.enabled);
     return this.participation.getDetails(eventId, user.id, role);
   }
 
