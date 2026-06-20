@@ -1077,8 +1077,11 @@ export class ParticipationService {
           name:
             p.userId != null
               ? nameOf(Number(p.userId))
-              : guest?.name ?? 'Гість',
-          gender: profile?.gender ?? guest?.gender ?? null,
+              : p.guestId != null
+                ? guest?.name ?? 'Гість'
+                : p.archivedName ?? 'Учасник',
+          gender:
+            profile?.gender ?? guest?.gender ?? p.archivedGender ?? null,
           isAdmin: profile?.isAdmin ?? false,
           isRoot: p.userId != null && this.access.isRoot(Number(p.userId)),
           isGuest: p.guestId != null,

@@ -478,7 +478,7 @@ export function ParticipantsPanel({
           )}
 
           {!ended && data.isParticipant && (
-            <label className="participants__checkbox">
+            <label className="participants__checkbox participants__reminder">
               <input
                 type="checkbox"
                 checked={data.remindBeforeEvent}

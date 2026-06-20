@@ -135,6 +135,11 @@ model EventParticipant {
   // Visual-only beach-volley pairing: two participants sharing the same pairId
   // form a pair. Has no effect on capacity, quota or any event logic.
   pairId        String?
+  // Snapshot kept when the linked user/guest is deleted from the directory, so
+  // past (ended) events still show them as a plain text record. Set only on
+  // archived rows, where both userId and guestId are null.
+  archivedName   String?
+  archivedGender Gender?
   joinedAt      DateTime @default(now())
   event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   guest         Guest?   @relation(fields: [guestId], references: [id], onDelete: Cascade)

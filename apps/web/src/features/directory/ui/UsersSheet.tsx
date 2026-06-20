@@ -5,7 +5,8 @@ import type {
 } from '@tg-calendar/shared-types';
 import { Sheet } from '../../../shared/ui/Sheet';
 import { PersonName } from '../../../shared/ui/PersonName';
-import { useDirectory } from '../useDirectory';
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog';
+import { useDeleteGuest, useDeleteUser, useDirectory } from '../useDirectory';
 import { EditUserSheet } from './EditUserSheet';
 
 interface Props {
@@ -15,9 +16,13 @@ interface Props {
 function UserRow({
   user,
   onEdit,
+  onDelete,
+  disabled,
 }: {
   user: DirectoryUserDto;
   onEdit?: (user: DirectoryUserDto) => void;
+  onDelete?: (user: DirectoryUserDto) => void;
+  disabled?: boolean;
 }): JSX.Element {
   return (
     <li className="participants__item">
@@ -45,11 +50,30 @@ function UserRow({
           ✏️
         </button>
       )}
+      {onDelete && !user.isRoot && (
+        <button
+          type="button"
+          className="participants__remove"
+          aria-label="Видалити"
+          disabled={disabled}
+          onClick={() => onDelete(user)}
+        >
+          ✕
+        </button>
+      )}
     </li>
   );
 }
 
-function GuestRow({ guest }: { guest: DirectoryGuestDto }): JSX.Element {
+function GuestRow({
+  guest,
+  onDelete,
+  disabled,
+}: {
+  guest: DirectoryGuestDto;
+  onDelete: (guest: DirectoryGuestDto) => void;
+  disabled?: boolean;
+}): JSX.Element {
   return (
     <li className="participants__item">
       <span className="participants__name">
@@ -60,6 +84,15 @@ function GuestRow({ guest }: { guest: DirectoryGuestDto }): JSX.Element {
           isUser={false}
         />
       </span>
+      <button
+        type="button"
+        className="participants__remove"
+        aria-label="Видалити"
+        disabled={disabled}
+        onClick={() => onDelete(guest)}
+      >
+        ✕
+      </button>
     </li>
   );
 }
@@ -91,6 +124,27 @@ function Section({
 export function UsersSheet({ onClose }: Props): JSX.Element {
   const { data, isLoading, isError } = useDirectory(true);
   const [editing, setEditing] = useState<DirectoryUserDto | null>(null);
+  const deleteUser = useDeleteUser();
+  const deleteGuest = useDeleteGuest();
+  const [confirm, setConfirm] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+  const removing = deleteUser.isPending || deleteGuest.isPending;
+
+  const askDeleteUser = (user: DirectoryUserDto): void => {
+    setConfirm({
+      message: `Видалити ${user.name} з бази застосунку? Користувача приберуть з усіх майбутніх подій. Це не виключає його з групи Telegram.`,
+      onConfirm: () => deleteUser.mutate(user.userId),
+    });
+  };
+
+  const askDeleteGuest = (guest: DirectoryGuestDto): void => {
+    setConfirm({
+      message: `Видалити гостя ${guest.name}? Його приберуть з усіх майбутніх подій.`,
+      onConfirm: () => deleteGuest.mutate(guest.id),
+    });
+  };
 
   return (
     <Sheet title="Користувачі" onClose={onClose}>
@@ -125,26 +179,66 @@ export function UsersSheet({ onClose }: Props): JSX.Element {
 
           <Section title="Власники абонементів" count={data.subscribers.length}>
             {data.subscribers.map((u) => (
-              <UserRow key={u.userId} user={u} onEdit={setEditing} />
+              <UserRow
+                key={u.userId}
+                user={u}
+                onEdit={setEditing}
+                onDelete={askDeleteUser}
+                disabled={removing}
+              />
             ))}
           </Section>
 
           <Section title="Учасники" count={data.members.length}>
             {data.members.map((u) => (
-              <UserRow key={u.userId} user={u} onEdit={setEditing} />
+              <UserRow
+                key={u.userId}
+                user={u}
+                onEdit={setEditing}
+                onDelete={askDeleteUser}
+                disabled={removing}
+              />
             ))}
           </Section>
 
           <Section title="Гості" count={data.guests.length}>
             {data.guests.map((g) => (
-              <GuestRow key={g.id} guest={g} />
+              <GuestRow
+                key={g.id}
+                guest={g}
+                onDelete={askDeleteGuest}
+                disabled={removing}
+              />
             ))}
           </Section>
+
+          {(deleteUser.isError || deleteGuest.isError) && (
+            <p className="form__error">
+              Не вдалося видалити. Можливо, спочатку зніміть права адміністратора.
+            </p>
+          )}
+
+          <p className="field__hint">
+            Щоб видалити адміністратора, спершу зніміть з нього права у розділі
+            «Адміністратори».
+          </p>
         </>
       )}
 
       {editing && (
         <EditUserSheet user={editing} onClose={() => setEditing(null)} />
+      )}
+
+      {confirm && (
+        <ConfirmDialog
+          message={confirm.message}
+          confirmLabel="Видалити"
+          onConfirm={() => {
+            confirm.onConfirm();
+            setConfirm(null);
+          }}
+          onCancel={() => setConfirm(null)}
+        />
       )}
     </Sheet>
   );

@@ -944,6 +944,10 @@ button {
   opacity: 0.5;
 }
 
+.participants__reminder {
+  margin-top: 18px;
+}
+
 .participants__search:disabled {
   opacity: 0.5;
 }
@@ -1005,7 +1009,6 @@ button {
 .participants__history-item--exit {
   padding-left: 8px;
   padding-right: 8px;
-  border-radius: var(--radius-sm);
   border-bottom: none;
 }
 

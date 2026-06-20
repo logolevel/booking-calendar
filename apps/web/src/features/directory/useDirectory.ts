@@ -3,7 +3,12 @@ import type {
   UpdateUserProfileRequest,
   UsersDirectoryResponse,
 } from '@tg-calendar/shared-types';
-import { fetchDirectory, updateUserProfile } from './api';
+import {
+  deleteGuest,
+  deleteUser,
+  fetchDirectory,
+  updateUserProfile,
+} from './api';
 
 export function useDirectory(enabled: boolean) {
   return useQuery({
@@ -30,4 +35,25 @@ export function useUpdateUserProfile() {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
+}
+
+// Removing a person may change event rosters, so refresh events too.
+function useDirectoryRemoval<T>(mutationFn: (input: T) => Promise<UsersDirectoryResponse>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: (data: UsersDirectoryResponse) => {
+      queryClient.setQueryData(['admin', 'directory'], data);
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+      void queryClient.invalidateQueries({ queryKey: ['participants'] });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  return useDirectoryRemoval((userId: number) => deleteUser(userId));
+}
+
+export function useDeleteGuest() {
+  return useDirectoryRemoval((guestId: string) => deleteGuest(guestId));
 }

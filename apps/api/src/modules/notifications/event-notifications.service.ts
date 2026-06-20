@@ -175,6 +175,8 @@ export class EventNotificationsService {
       } else if (p.guestId != null) {
         const guest = guestMap.get(p.guestId);
         labelById.set(p.id, `👥 ${esc(guest?.name ?? 'Гість')} (гість)`);
+      } else if (p.archivedName) {
+        labelById.set(p.id, esc(p.archivedName));
       } else {
         labelById.set(p.id, '—');
       }
