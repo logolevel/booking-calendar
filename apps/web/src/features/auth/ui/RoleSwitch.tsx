@@ -4,6 +4,7 @@ const OPTIONS: { value: PreviewMode; label: string }[] = [
   { value: PREVIEW_MODE.ADMIN, label: 'Адмін' },
   { value: PREVIEW_MODE.SUBSCRIBER, label: 'Власник абонемента' },
   { value: PREVIEW_MODE.MEMBER, label: 'Учасник' },
+  { value: PREVIEW_MODE.TRAINER, label: 'Тренер' },
 ];
 
 interface Props {

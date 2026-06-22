@@ -108,6 +108,28 @@ export class AccessService {
     return undefined;
   }
 
+  // Trainer flag to report under a preview; undefined means "use the real value".
+  // "trainer" mode previews a member with trainer permissions. Admin-only.
+  previewTrainer(
+    realRole: Role | null,
+    preview?: string | null,
+  ): boolean | undefined {
+    if (realRole !== Role.admin || !preview) {
+      return undefined;
+    }
+    if (preview === PREVIEW_MODE.TRAINER) {
+      return true;
+    }
+    if (
+      preview === Role.member ||
+      preview === Role.external ||
+      preview === PREVIEW_MODE.SUBSCRIBER
+    ) {
+      return false;
+    }
+    return undefined;
+  }
+
   async syncUser(user: VerifiedTelegramUser, role: Role): Promise<void> {
     await this.prisma.user.upsert({
       where: { id: BigInt(user.id) },

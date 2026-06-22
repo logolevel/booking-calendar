@@ -20,6 +20,7 @@ const PREVIEW_LABELS: Record<PreviewMode, string> = {
   [PREVIEW_MODE.SUBSCRIBER]: 'Власник абонемента',
   [PREVIEW_MODE.MEMBER]: 'Учасник',
   [PREVIEW_MODE.EXTERNAL]: 'Гість',
+  [PREVIEW_MODE.TRAINER]: 'Тренер',
 };
 
 function StateScreen({

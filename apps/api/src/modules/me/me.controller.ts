@@ -43,6 +43,7 @@ export class MeController {
     const stored = await this.me.getStored(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     const forcedSubscriber = this.access.previewSubscriber(realRole, preview);
+    const forcedTrainer = this.access.previewTrainer(realRole, preview);
     const isTrainer = stored?.isTrainer ?? false;
     return this.build(
       user,
@@ -51,6 +52,7 @@ export class MeController {
       realRole === Role.admin,
       isTrainer,
       forcedSubscriber,
+      forcedTrainer,
     );
   }
 
@@ -68,6 +70,7 @@ export class MeController {
     const stored = await this.me.completeOnboarding(user.id, dto);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     const forcedSubscriber = this.access.previewSubscriber(realRole, preview);
+    const forcedTrainer = this.access.previewTrainer(realRole, preview);
     const isTrainer = stored?.isTrainer ?? false;
     return this.build(
       user,
@@ -76,6 +79,7 @@ export class MeController {
       realRole === Role.admin,
       isTrainer,
       forcedSubscriber,
+      forcedTrainer,
     );
   }
 
@@ -87,6 +91,8 @@ export class MeController {
     isTrainer: boolean,
     // When set, overrides the real subscription status (admin role preview).
     forcedSubscriber?: boolean,
+    // When set, overrides the real trainer flag (admin role preview).
+    forcedTrainer?: boolean,
   ): Promise<MeResponse> {
     const [
       maxDaysAhead,
@@ -111,7 +117,6 @@ export class MeController {
       id: user.id,
       role,
       isAdmin,
-      isTrainer,
       firstName: stored?.firstName ?? user.firstName,
       lastName: stored?.lastName ?? user.lastName,
       username: stored?.username ?? user.username,
@@ -125,6 +130,7 @@ export class MeController {
       subPrimeEnd,
       primeMemberOpenHour,
       isSubscriber: forcedSubscriber ?? isSubscriber,
+      isTrainer: forcedTrainer ?? isTrainer,
     };
   }
 }

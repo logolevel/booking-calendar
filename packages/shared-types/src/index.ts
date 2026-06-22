@@ -267,11 +267,13 @@ export const PREVIEW_ROLE_HEADER = 'x-preview-role';
 // Admin role-preview modes carried in PREVIEW_ROLE_HEADER. Besides the three
 // roles, "subscriber" previews a member who holds an active subscription
 // (member role + subscription perks, e.g. bypassing the prime-time gate).
+// "trainer" previews a member with trainer permissions (can create group events).
 export const PREVIEW_MODE = {
   ADMIN: 'admin',
   SUBSCRIBER: 'subscriber',
   MEMBER: 'member',
   EXTERNAL: 'external',
+  TRAINER: 'trainer',
 } as const;
 
 export type PreviewMode = (typeof PREVIEW_MODE)[keyof typeof PREVIEW_MODE];
