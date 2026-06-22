@@ -47,7 +47,12 @@ export class CreateEventDto {
   @IsOptional()
   @IsString()
   @MaxLength(32)
-  @Matches(/^[+()\d\s-]+$/, { message: 'phone must be a valid number' })
+  // Accepts Ukrainian mobile/landline numbers in common formats:
+  // +380XXXXXXXXX, 0XXXXXXXXX, 380XXXXXXXXX, optionally with spaces/dashes/parens.
+  @Matches(
+    /^\+?3?8?0[\s-]?(\(?\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}|\(?\d{3}\)?[\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}|\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4})$/,
+    { message: 'Номер телефону має бути українським (+380...)' },
+  )
   organizerPhone?: string;
 
   @IsOptional()

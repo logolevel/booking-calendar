@@ -615,6 +615,18 @@ button {
   margin: 0 0 12px;
 }
 
+.field__error {
+  display: block;
+  color: var(--destructive);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.input--error {
+  border-color: var(--destructive) !important;
+  outline-color: var(--destructive);
+}
+
 .form__prime {
   display: flex;
   align-items: center;

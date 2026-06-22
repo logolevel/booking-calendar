@@ -242,13 +242,21 @@ export function EventForm({
           : null;
 
   const effectiveOrganizerName = iAmTrainer ? currentUserName : organizerName;
+
+  // Same pattern as the backend DTO: Ukrainian mobile/landline numbers.
+  const UA_PHONE_RE =
+    /^\+?3?8?0[\s-]?(\(?\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}|\(?\d{3}\)?[\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}|\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4})$/;
+  const phoneRaw = organizerPhone.trim();
+  const phoneInvalid = phoneRaw.length > 0 && !UA_PHONE_RE.test(phoneRaw);
+
   const canSubmit =
     Boolean(startsAt) &&
     Boolean(endsAt) &&
     !primeBlocked &&
     !quotaBlocked &&
     (!isGroup || effectiveOrganizerName.trim().length > 0) &&
-    (!isGroup || groupSize.trim().length > 0);
+    (!isGroup || groupSize.trim().length > 0) &&
+    (!isGroup || !phoneInvalid);
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
@@ -348,11 +356,18 @@ export function EventForm({
               type="tel"
               inputMode="tel"
               value={organizerPhone}
+              placeholder="+380 XX XXX XX XX"
+              className={phoneInvalid ? 'input--error' : undefined}
               onChange={(e) => {
                 clearError();
                 setOrganizerPhone(e.target.value);
               }}
             />
+            {phoneInvalid && (
+              <span className="field__error">
+                Введіть коректний номер (+380...)
+              </span>
+            )}
           </label>
 
           <label className="field">
