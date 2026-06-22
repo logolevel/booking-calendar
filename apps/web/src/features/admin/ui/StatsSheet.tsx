@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import type { StatsCategory, StatsUserRow } from '@tg-calendar/shared-types';
 import { Sheet } from '../../../shared/ui/Sheet';
 import { useStats } from '../useStats';
@@ -20,6 +20,9 @@ const CATEGORY_LABELS: Record<StatsCategory, string> = {
 
 const LOCAL_PATTERN = 'yyyy-MM-dd';
 
+// Special sentinel value for the full-season (whole current year) option.
+const SEASON_VALUE = 'season';
+
 const UK_MONTHS = [
   'Січень','Лютий','Березень','Квітень','Травень','Червень',
   'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень',
@@ -30,25 +33,36 @@ function ukrainianMonth(ym: string): string {
   return `${UK_MONTHS[m - 1] ?? ''} ${y}`;
 }
 
-function monthOptions(): { value: string; label: string }[] {
-  const now = new Date();
-  const opts: { value: string; label: string }[] = [];
-  for (let i = 0; i < 12; i++) {
-    const d = subMonths(now, i);
-    const ym = format(d, 'yyyy-MM');
+// Returns months of the current year up to and including the current month,
+// ordered newest first, preceded by a "Season YYYY" option.
+function periodOptions(now: Date): { value: string; label: string }[] {
+  const year = now.getFullYear();
+  const curMonth = now.getMonth(); // 0-based
+  const opts: { value: string; label: string }[] = [
+    { value: SEASON_VALUE, label: `Сезон ${year}` },
+  ];
+  for (let m = curMonth; m >= 0; m--) {
+    const ym = `${year}-${String(m + 1).padStart(2, '0')}`;
     opts.push({ value: ym, label: ukrainianMonth(ym) });
   }
   return opts;
 }
 
-function fromMonth(ym: string): string {
-  const d = new Date(`${ym}-01`);
-  return format(startOfMonth(d), LOCAL_PATTERN);
+function periodRange(value: string, now: Date): { from: string; to: string } {
+  if (value === SEASON_VALUE) {
+    const year = now.getFullYear();
+    return { from: `${year}-01-01`, to: format(now, LOCAL_PATTERN) };
+  }
+  const d = new Date(`${value}-01`);
+  return {
+    from: format(startOfMonth(d), LOCAL_PATTERN),
+    to: format(endOfMonth(d), LOCAL_PATTERN),
+  };
 }
 
-function toMonth(ym: string): string {
-  const d = new Date(`${ym}-01`);
-  return format(endOfMonth(d), LOCAL_PATTERN);
+function periodLabel(value: string, now: Date): string {
+  if (value === SEASON_VALUE) return `Сезон ${now.getFullYear()}`;
+  return ukrainianMonth(value);
 }
 
 function getDaysInMonth(ym: string): string[] {
@@ -118,21 +132,25 @@ function fmtDay(dateStr: string): string {
 }
 
 export function StatsSheet({ onClose }: Props): JSX.Element {
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const currentYm = format(now, 'yyyy-MM');
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(currentYm);
+  const [selected, setSelected] = useState<string>(currentYm);
   const [category, setCategory] = useState<StatsCategory>('all');
   const [sortKey, setSortKey] = useState<SortKey>('total');
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
-  const from = fromMonth(selectedMonth);
-  const to = toMonth(selectedMonth);
+  const isSeason = selected === SEASON_VALUE;
+  const { from, to } = useMemo(() => periodRange(selected, now), [selected, now]);
 
   const { data, isLoading, isError } = useStats(from, to);
 
-  const daysInMonth = useMemo(() => getDaysInMonth(selectedMonth), [selectedMonth]);
+  // Day grid only makes sense for a single month view.
+  const daysInMonth = useMemo(
+    () => (isSeason ? [] : getDaysInMonth(selected)),
+    [isSeason, selected],
+  );
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -153,7 +171,7 @@ export function StatsSheet({ onClose }: Props): JSX.Element {
     );
   }, [rows]);
 
-  const months = useMemo(() => monthOptions(), []);
+  const periods = useMemo(() => periodOptions(now), [now]);
 
   function handleSort(key: SortKey): void {
     if (sortKey === key) {
@@ -181,18 +199,18 @@ export function StatsSheet({ onClose }: Props): JSX.Element {
         {/* ── Filters ── */}
         <div className="stats__filters">
           <label className="stats__filter-label">
-            <span>Місяць</span>
+            <span>Період</span>
             <select
               className="stats__select"
-              value={selectedMonth}
+              value={selected}
               onChange={(e) => {
-                setSelectedMonth(e.target.value);
+                setSelected(e.target.value);
                 setExpandedRow(null);
               }}
             >
-              {months.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {ukrainianMonth(m.value)}
+              {periods.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
                 </option>
               ))}
             </select>
@@ -216,7 +234,7 @@ export function StatsSheet({ onClose }: Props): JSX.Element {
 
         {/* ── Period label ── */}
         <div className="stats__period">
-          {ukrainianMonth(selectedMonth)}
+          {periodLabel(selected, now)}
         </div>
 
         {/* ── State ── */}
@@ -332,25 +350,27 @@ export function StatsSheet({ onClose }: Props): JSX.Element {
 
                         {isExpanded && (
                           <div className="stats__days">
-                            <div className="stats__days-grid">
-                              {daysInMonth.map((day) => {
-                                const v = visitsForDay(row, day);
-                                return (
-                                  <div
-                                    key={day}
-                                    className={`stats__day${v > 0 ? ' stats__day--active' : ''}`}
-                                    title={fmtDay(day)}
-                                  >
-                                    <span className="stats__day-num">
-                                      {parseInt(day.slice(8), 10)}
-                                    </span>
-                                    {v > 0 && (
-                                      <span className="stats__day-dot" />
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            {!isSeason && (
+                              <div className="stats__days-grid">
+                                {daysInMonth.map((day) => {
+                                  const v = visitsForDay(row, day);
+                                  return (
+                                    <div
+                                      key={day}
+                                      className={`stats__day${v > 0 ? ' stats__day--active' : ''}`}
+                                      title={fmtDay(day)}
+                                    >
+                                      <span className="stats__day-num">
+                                        {parseInt(day.slice(8), 10)}
+                                      </span>
+                                      {v > 0 && (
+                                        <span className="stats__day-dot" />
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                             <div className="stats__days-list">
                               {row.days.map((d) => (
                                 <div key={d.date} className="stats__day-entry">
