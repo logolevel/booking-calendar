@@ -5,7 +5,6 @@ const LABELS: Record<EventType, string> = {
   [EVENT_TYPE.WOMEN]: 'Жінки (ігрове)',
   [EVENT_TYPE.MEN]: 'Чоловіки (ігрове)',
   [EVENT_TYPE.MIXED]: 'Мікст',
-  [EVENT_TYPE.INDIVIDUAL]: 'Індивідуальне',
   [EVENT_TYPE.TECH_WOMEN]: 'Жінки (технічка)',
   [EVENT_TYPE.TECH_MEN]: 'Чоловіки (технічка)',
   [EVENT_TYPE.GROUP]: 'Група',

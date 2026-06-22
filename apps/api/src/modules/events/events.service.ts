@@ -37,7 +37,6 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   women: 'Жінки (ігрове)',
   men: 'Чоловіки (ігрове)',
   mixed: 'Мікст',
-  individual: 'Індивідуальне',
   tech_women: 'Жінки (технічка)',
   tech_men: 'Чоловіки (технічка)',
   group: 'Група',

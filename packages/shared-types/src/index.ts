@@ -17,7 +17,6 @@ export const EVENT_TYPE = {
   WOMEN: 'women',
   MEN: 'men',
   MIXED: 'mixed',
-  INDIVIDUAL: 'individual',
   TECH_WOMEN: 'tech_women',
   TECH_MEN: 'tech_men',
   // Outside group booking (admin-only): no sign-up list, just an organizer.

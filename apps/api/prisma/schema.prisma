@@ -17,7 +17,6 @@ enum EventType {
   women
   men
   mixed
-  individual
   tech_women
   tech_men
   group

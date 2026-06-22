@@ -371,7 +371,7 @@ export function EventForm({
           </label>
 
           <label className="field">
-            <span className="field__label">Кількість людей</span>
+            <span className="field__label">Кількість людей (у яких нема абонемента)</span>
             <input
               type="text"
               inputMode="numeric"

@@ -379,7 +379,7 @@ export function ParticipantsPanel({
           </div>
           {event.groupSize != null && (
             <div className="participants__time">
-              Кількість людей: {event.groupSize}
+              Кількість людей (без абонемента): {event.groupSize}
             </div>
           )}
           {event.organizerPhone && (
