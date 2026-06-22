@@ -132,7 +132,12 @@ export class EventsService {
     const isChildren = dto.type === EVENT_TYPE.CHILDREN;
     // Both GROUP and CHILDREN are organizer-led booking types: no sign-up list.
     const isOrganizerType = isGroup || isChildren;
-    if (isOrganizerType && !isAdmin && !isTrainer) {
+    if (isChildren && !isAdmin) {
+      throw new ForbiddenException(
+        'Тренування «Діти» може створити лише адміністратор.',
+      );
+    }
+    if (isGroup && !isAdmin && !isTrainer) {
       throw new ForbiddenException(
         'Групове бронювання може створити лише адміністратор або тренер.',
       );

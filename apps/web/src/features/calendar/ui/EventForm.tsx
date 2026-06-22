@@ -118,13 +118,13 @@ export function EventForm({
     ? Math.max(MIN_CAPACITY, event?.participantCount ?? MIN_CAPACITY)
     : MIN_CAPACITY;
   const capacityOptions = CAPACITY_OPTIONS.filter((n) => n >= minCapacity);
-  // GROUP and CHILDREN types are available to admins and trainers; keep when editing.
+  // GROUP is available to admins and trainers; CHILDREN is admin-only.
   const typeOptions = Object.values(EVENT_TYPE).filter((t) => {
     if (t === EVENT_TYPE.GROUP) {
       return isAdmin || isTrainer || event?.type === EVENT_TYPE.GROUP;
     }
     if (t === EVENT_TYPE.CHILDREN) {
-      return isAdmin || isTrainer || event?.type === EVENT_TYPE.CHILDREN;
+      return isAdmin || event?.type === EVENT_TYPE.CHILDREN;
     }
     return true;
   });
