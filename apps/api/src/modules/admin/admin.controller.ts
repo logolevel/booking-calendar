@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
@@ -15,6 +16,7 @@ import type {
   AdminListResponse,
   AdminNotificationSettingsResponse,
   AdminSettingsResponse,
+  StatsResponse,
   TrainerListResponse,
 } from '@tg-calendar/shared-types';
 import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
@@ -25,10 +27,12 @@ import { SettingsService } from '../settings/settings.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { UsersService } from '../users/users.service';
 import { NotificationPrefsService } from '../notifications/notification-prefs.service';
+import { StatsService } from './stats.service';
 import { GrantAdminDto } from './dto/grant-admin.dto';
 import { GrantTrainerDto } from './dto/grant-trainer.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
+import { StatsQueryDto } from './dto/stats-query.dto';
 
 @Controller('api/admin')
 @UseGuards(TelegramAuthGuard)
@@ -39,6 +43,7 @@ export class AdminController {
     private readonly telegram: TelegramService,
     private readonly users: UsersService,
     private readonly notificationPrefs: NotificationPrefsService,
+    private readonly stats: StatsService,
   ) {}
 
   @Get('admins')
@@ -304,6 +309,18 @@ export class AdminController {
       subPrimeEnd,
       primeMemberOpenHour,
     };
+  }
+
+  @Get('stats')
+  async getStats(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Query() query: StatsQueryDto,
+  ): Promise<StatsResponse> {
+    await this.assertAdmin(user.id);
+    if (!query.from || !query.to) {
+      throw new BadRequestException('from and to are required');
+    }
+    return this.stats.getStats(query.from, query.to);
   }
 
   private async assertAdmin(userId: number): Promise<void> {

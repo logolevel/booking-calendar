@@ -221,6 +221,46 @@ export interface GrantAdminRequest {
   userId: number;
 }
 
+// ─── Statistics ──────────────────────────────────────────────────────────────
+
+// A single day's visit summary for one user.
+export interface StatsDayEntry {
+  date: string; // "YYYY-MM-DD" in Europe/Kyiv
+  visits: number;
+}
+
+// Per-user attendance summary within the requested period.
+export interface StatsUserRow {
+  userId: number | null;
+  // null when the row represents an outside guest (no account).
+  guestId: string | null;
+  name: string;
+  // Total event participations in the period.
+  totalVisits: number;
+  // Breakdown by event type.
+  regularVisits: number;  // women / men / mixed / tech_women / tech_men
+  groupVisits: number;    // group
+  childrenVisits: number; // children
+  // true when the user held an active subscription for ANY part of the period.
+  hasSubscription: boolean;
+  days: StatsDayEntry[];
+}
+
+export type StatsCategory = 'all' | 'regular' | 'group' | 'children' | 'no_sub';
+
+export interface StatsRequest {
+  // ISO date strings for the Europe/Kyiv day boundaries.
+  from: string;
+  to: string;
+  category?: StatsCategory;
+}
+
+export interface StatsResponse {
+  from: string;
+  to: string;
+  rows: StatsUserRow[];
+}
+
 // Header used by an admin to preview the app as another role.
 export const PREVIEW_ROLE_HEADER = 'x-preview-role';
 

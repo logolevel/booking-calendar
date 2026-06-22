@@ -5,6 +5,7 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { UsersModule } from '../users/users.module';
 import { EventNotificationsModule } from '../notifications/event-notifications.module';
 import { AdminController } from './admin.controller';
+import { StatsService } from './stats.service';
 
 @Module({
   imports: [
@@ -15,5 +16,6 @@ import { AdminController } from './admin.controller';
     EventNotificationsModule,
   ],
   controllers: [AdminController],
+  providers: [StatsService],
 })
 export class AdminModule {}

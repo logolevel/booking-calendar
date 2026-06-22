@@ -2,6 +2,7 @@ import type {
   AdminListResponse,
   AdminNotificationSettingsResponse,
   AdminSettingsResponse,
+  StatsResponse,
   TrainerListResponse,
   UpdateAdminNotificationSettingsRequest,
   UpdateAdminSettingsRequest,
@@ -53,4 +54,10 @@ export function grantTrainer(userId: number): Promise<TrainerListResponse> {
 
 export function revokeTrainer(userId: number): Promise<TrainerListResponse> {
   return apiDelete<TrainerListResponse>(`/api/admin/trainers/${userId}`);
+}
+
+export function fetchStats(from: string, to: string): Promise<StatsResponse> {
+  return apiGet<StatsResponse>(
+    `/api/admin/stats?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  );
 }

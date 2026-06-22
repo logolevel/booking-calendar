@@ -14,13 +14,15 @@ interface Props {
   onTrainers: () => void;
   onNotifications: () => void;
   onSettings: () => void;
+  onStats: () => void;
   onClose: () => void;
 }
 
 const ITEMS: { icon: string; label: string; key: keyof Pick<
   Props,
-  'onUsers' | 'onSubs' | 'onAdmins' | 'onTrainers' | 'onNotifications' | 'onSettings'
+  'onUsers' | 'onSubs' | 'onAdmins' | 'onTrainers' | 'onNotifications' | 'onSettings' | 'onStats'
 > }[] = [
+  { icon: '📊', label: 'Статистика', key: 'onStats' },
   { icon: '👥', label: 'Користувачі', key: 'onUsers' },
   { icon: '⭐', label: 'Абонементи', key: 'onSubs' },
   { icon: '👑', label: 'Адміністратори', key: 'onAdmins' },
