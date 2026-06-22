@@ -178,7 +178,7 @@ export function UsersSheet({ onClose }: Props): JSX.Element {
             );
           })()}
 
-          <Section title="🥋 Тренери" count={data.trainers.length}>
+          <Section title="Тренери" count={data.trainers.length}>
             {data.trainers.map((u) => (
               <UserRow
                 key={u.userId}
