@@ -41,6 +41,8 @@ model User {
   // Sticky personal preference: when true, the bot reminds this user one hour
   // before every event they take part in. Toggled from any event's panel.
   remindBeforeEvent Boolean @default(false)
+  // Trainer flag: trainers may create group (Група) events like admins.
+  isTrainer   Boolean   @default(false)
   // Per-admin notification opt-ins (only meaningful for admins). Default true
   // preserves the prior behavior of admins receiving every notice. An admin who
   // is also a participant of an event is always notified regardless of these.

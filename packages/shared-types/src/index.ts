@@ -119,6 +119,8 @@ export interface MeResponse {
   // Whether this user currently holds an active subscription (bypasses the
   // member access gate on the subscription-prime window).
   isSubscriber: boolean;
+  // True when the real authenticated user is a trainer (can create GROUP events).
+  isTrainer: boolean;
 }
 
 export interface OnboardingRequest {
@@ -191,6 +193,23 @@ export interface AdminUserDto {
   isRoot: boolean;
   // True when this row is the current viewer.
   isSelf: boolean;
+}
+
+// A trainer entry shown in the trainer management list.
+export interface TrainerUserDto {
+  userId: number;
+  name: string;
+  username: string | null;
+  gender: Gender | null;
+  isSelf: boolean;
+}
+
+export interface TrainerListResponse {
+  trainers: TrainerUserDto[];
+}
+
+export interface GrantTrainerRequest {
+  userId: number;
 }
 
 export interface AdminListResponse {
@@ -292,6 +311,7 @@ export interface ParticipantDto {
   isAdmin: boolean;
   // The root super-admin (ADMIN_ID); shown with a snowflake instead of a crown.
   isRoot: boolean;
+  isTrainer: boolean;
   isGuest: boolean;
   addedByUserId: number;
   addedByName: string;
@@ -313,6 +333,7 @@ export interface WaitlistEntryDto {
   gender: Gender | null;
   isAdmin: boolean;
   isRoot: boolean;
+  isTrainer: boolean;
   isSelf: boolean;
   createdAt: string;
 }
@@ -387,9 +408,10 @@ export interface SubscriptionDto {
   userName: string;
   gender: Gender | null;
   // Current status of the owner, for the name badge (kept in sync with the
-  // directory): admin 👑 / root ❄️ / active-subscriber ⭐.
+  // directory): admin 👑 / root ❄️ / trainer 🥋 / active-subscriber ⭐.
   isAdmin: boolean;
   isRoot: boolean;
+  isTrainer: boolean;
   isSubscriber: boolean;
   startsAt: string;
   endsAt: string;
@@ -422,6 +444,7 @@ export interface DirectoryUserDto {
   gender: Gender | null;
   isRoot: boolean;
   isAdmin: boolean;
+  isTrainer: boolean;
   // Has an active subscription right now.
   isSubscriber: boolean;
 }
@@ -440,10 +463,12 @@ export interface DirectoryGuestDto {
 }
 
 export interface UsersDirectoryResponse {
-  // Grand total across every category (admins + subscribers + members + guests).
+  // Grand total across every category (admins + trainers + subscribers + members + guests).
   total: number;
   admins: DirectoryUserDto[];
-  // Non-admin users with an active subscription.
+  // Trainers (can create GROUP events).
+  trainers: DirectoryUserDto[];
+  // Non-admin, non-trainer users with an active subscription.
   subscribers: DirectoryUserDto[];
   // Remaining registered users (group members / external).
   members: DirectoryUserDto[];

@@ -100,7 +100,8 @@ export class EventsController {
     const realRole = await this.requireAccess(user.id);
     // Admins previewing a non-admin role are subject to that role's limits.
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
-    const created = await this.events.create(user.id, role, dto);
+    const isTrainer = await this.access.isTrainerUser(user.id);
+    const created = await this.events.create(user.id, role, dto, isTrainer);
     this.gateway.emitCalendarUpdate();
     return created;
   }

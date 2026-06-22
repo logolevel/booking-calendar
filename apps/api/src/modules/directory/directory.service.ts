@@ -32,21 +32,24 @@ export class DirectoryService {
   // separate guest directory.
   async list(): Promise<UsersDirectoryResponse> {
     const now = new Date();
-    const [users, guestRows, activeSubs, adminIds] = await Promise.all([
-      this.prisma.user.findMany({
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-      }),
-      this.prisma.guest.findMany({
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-      }),
-      this.prisma.subscription.findMany({
-        where: { startsAt: { lte: now }, endsAt: { gte: now } },
-        select: { userId: true },
-      }),
-      this.access.listAdminIds(),
-    ]);
+    const [users, guestRows, activeSubs, adminIds, trainerIds] =
+      await Promise.all([
+        this.prisma.user.findMany({
+          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        }),
+        this.prisma.guest.findMany({
+          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        }),
+        this.prisma.subscription.findMany({
+          where: { startsAt: { lte: now }, endsAt: { gte: now } },
+          select: { userId: true },
+        }),
+        this.access.listAdminIds(),
+        this.access.listTrainerIds(),
+      ]);
 
     const adminSet = new Set(adminIds);
+    const trainerSet = new Set(trainerIds);
     const subscriberSet = new Set(activeSubs.map((s) => Number(s.userId)));
 
     // Admins (root first) resolved through listByIds so an env-only root that
@@ -61,9 +64,11 @@ export class DirectoryService {
       gender: r.gender,
       isRoot: this.access.isRoot(r.userId),
       isAdmin: true,
+      isTrainer: false,
       isSubscriber: subscriberSet.has(r.userId),
     }));
 
+    const trainers: DirectoryUserDto[] = [];
     const subscribers: DirectoryUserDto[] = [];
     const members: DirectoryUserDto[] = [];
     for (const u of users) {
@@ -80,9 +85,16 @@ export class DirectoryService {
         gender: u.gender,
         isRoot: false,
         isAdmin: false,
+        isTrainer: u.isTrainer,
         isSubscriber: subscriberSet.has(id),
       };
-      (dto.isSubscriber ? subscribers : members).push(dto);
+      if (u.isTrainer) {
+        trainers.push(dto);
+      } else if (dto.isSubscriber) {
+        subscribers.push(dto);
+      } else {
+        members.push(dto);
+      }
     }
 
     const guests = guestRows.map((g) => ({
@@ -93,8 +105,13 @@ export class DirectoryService {
 
     return {
       total:
-        admins.length + subscribers.length + members.length + guests.length,
+        admins.length +
+        trainers.length +
+        subscribers.length +
+        members.length +
+        guests.length,
       admins,
+      trainers,
       subscribers,
       members,
       guests,

@@ -2,6 +2,7 @@ import type {
   AdminListResponse,
   AdminNotificationSettingsResponse,
   AdminSettingsResponse,
+  TrainerListResponse,
   UpdateAdminNotificationSettingsRequest,
   UpdateAdminSettingsRequest,
 } from '@tg-calendar/shared-types';
@@ -40,4 +41,16 @@ export function grantAdmin(userId: number): Promise<AdminListResponse> {
 
 export function revokeAdmin(userId: number): Promise<AdminListResponse> {
   return apiDelete<AdminListResponse>(`/api/admin/admins/${userId}`);
+}
+
+export function fetchTrainers(): Promise<TrainerListResponse> {
+  return apiGet<TrainerListResponse>('/api/admin/trainers');
+}
+
+export function grantTrainer(userId: number): Promise<TrainerListResponse> {
+  return apiPost<TrainerListResponse>('/api/admin/trainers', { userId });
+}
+
+export function revokeTrainer(userId: number): Promise<TrainerListResponse> {
+  return apiDelete<TrainerListResponse>(`/api/admin/trainers/${userId}`);
 }

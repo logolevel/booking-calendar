@@ -43,11 +43,13 @@ export class MeController {
     const stored = await this.me.getStored(user.id);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     const forcedSubscriber = this.access.previewSubscriber(realRole, preview);
+    const isTrainer = stored?.isTrainer ?? false;
     return this.build(
       user,
       stored,
       role,
       realRole === Role.admin,
+      isTrainer,
       forcedSubscriber,
     );
   }
@@ -66,11 +68,13 @@ export class MeController {
     const stored = await this.me.completeOnboarding(user.id, dto);
     const role = this.access.applyPreview(realRole, preview) ?? realRole;
     const forcedSubscriber = this.access.previewSubscriber(realRole, preview);
+    const isTrainer = stored?.isTrainer ?? false;
     return this.build(
       user,
       stored,
       role,
       realRole === Role.admin,
+      isTrainer,
       forcedSubscriber,
     );
   }
@@ -80,6 +84,7 @@ export class MeController {
     stored: User | null,
     role: Role,
     isAdmin: boolean,
+    isTrainer: boolean,
     // When set, overrides the real subscription status (admin role preview).
     forcedSubscriber?: boolean,
   ): Promise<MeResponse> {
@@ -106,6 +111,7 @@ export class MeController {
       id: user.id,
       role,
       isAdmin,
+      isTrainer,
       firstName: stored?.firstName ?? user.firstName,
       lastName: stored?.lastName ?? user.lastName,
       username: stored?.username ?? user.username,

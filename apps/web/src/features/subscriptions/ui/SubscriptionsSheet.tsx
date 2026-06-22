@@ -191,6 +191,7 @@ export function SubscriptionsSheet({ onClose }: Props): JSX.Element {
                       isAdmin={s.isAdmin}
                       isUser
                       isRoot={s.isRoot}
+                      isTrainer={s.isTrainer}
                       isSubscriber={s.isSubscriber}
                     />
                     <span className="subs__meta">

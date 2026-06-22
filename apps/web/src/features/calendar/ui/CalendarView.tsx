@@ -151,6 +151,7 @@ interface Props {
   subPrimeEnd: string;
   primeMemberOpenHour: number;
   isSubscriber: boolean;
+  isTrainer?: boolean;
   // Event id from a Telegram deep link; opens its roster on first load.
   initialEventId?: string | null;
 }
@@ -165,6 +166,7 @@ export function CalendarView({
   subPrimeEnd,
   primeMemberOpenHour,
   isSubscriber,
+  isTrainer = false,
   initialEventId,
 }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
@@ -445,6 +447,7 @@ export function CalendarView({
             <EventForm
               event={activeEvent ?? undefined}
               isAdmin={isAdmin}
+              isTrainer={isTrainer}
               initialStart={draft ? draft.start.toISOString() : undefined}
               initialEnd={draft ? draft.end.toISOString() : undefined}
               subPrimeStart={subPrimeStart}

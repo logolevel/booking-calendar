@@ -9,6 +9,7 @@ export interface UserProfile {
   name: string;
   gender: Gender | null;
   isAdmin: boolean;
+  isTrainer: boolean;
 }
 
 @Injectable()
@@ -110,6 +111,7 @@ export class UsersService {
         name: this.displayName(u),
         gender: u.gender,
         isAdmin: u.isAdmin,
+        isTrainer: u.isTrainer,
       });
     }
     return map;

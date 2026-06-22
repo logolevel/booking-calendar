@@ -7,6 +7,7 @@ import { CalendarView } from './features/calendar/ui/CalendarView';
 import { OnboardingForm } from './features/onboarding/ui/OnboardingForm';
 import { SettingsSheet } from './features/admin/ui/SettingsSheet';
 import { AdminsSheet } from './features/admin/ui/AdminsSheet';
+import { TrainersSheet } from './features/admin/ui/TrainersSheet';
 import { AdminMenuSheet } from './features/admin/ui/AdminMenuSheet';
 import { NotificationsSheet } from './features/admin/ui/NotificationsSheet';
 import { SubscriptionsSheet } from './features/subscriptions/ui/SubscriptionsSheet';
@@ -48,6 +49,7 @@ export function App(): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminsOpen, setAdminsOpen] = useState(false);
+  const [trainersOpen, setTrainersOpen] = useState(false);
   const [subsOpen, setSubsOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -122,6 +124,7 @@ export function App(): JSX.Element {
           onUsers={() => setUsersOpen(true)}
           onSubs={() => setSubsOpen(true)}
           onAdmins={() => setAdminsOpen(true)}
+          onTrainers={() => setTrainersOpen(true)}
           onNotifications={() => setNotificationsOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           onClose={() => setMenuOpen(false)}
@@ -129,6 +132,7 @@ export function App(): JSX.Element {
       )}
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {adminsOpen && <AdminsSheet onClose={() => setAdminsOpen(false)} />}
+      {trainersOpen && <TrainersSheet onClose={() => setTrainersOpen(false)} />}
       {subsOpen && <SubscriptionsSheet onClose={() => setSubsOpen(false)} />}
       {usersOpen && <UsersSheet onClose={() => setUsersOpen(false)} />}
       {notificationsOpen && (
@@ -157,6 +161,7 @@ export function App(): JSX.Element {
           subPrimeEnd={me.subPrimeEnd}
           primeMemberOpenHour={me.primeMemberOpenHour}
           isSubscriber={me.isSubscriber}
+          isTrainer={me.isTrainer}
           initialEventId={initialEventId}
         />
       </main>

@@ -33,6 +33,7 @@ function UserRow({
           isAdmin={user.isAdmin}
           isUser
           isRoot={user.isRoot}
+          isTrainer={user.isTrainer}
           isSubscriber={user.isSubscriber}
         />
         {user.username && (
@@ -176,6 +177,18 @@ export function UsersSheet({ onClose }: Props): JSX.Element {
               </>
             );
           })()}
+
+          <Section title="🥋 Тренери" count={data.trainers.length}>
+            {data.trainers.map((u) => (
+              <UserRow
+                key={u.userId}
+                user={u}
+                onEdit={setEditing}
+                onDelete={askDeleteUser}
+                disabled={removing}
+              />
+            ))}
+          </Section>
 
           <Section title="Власники абонементів" count={data.subscribers.length}>
             {data.subscribers.map((u) => (

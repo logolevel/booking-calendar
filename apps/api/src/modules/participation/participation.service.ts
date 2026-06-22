@@ -1116,6 +1116,7 @@ export class ParticipationService {
             profile?.gender ?? guest?.gender ?? p.archivedGender ?? null,
           isAdmin: profile?.isAdmin ?? false,
           isRoot: p.userId != null && this.access.isRoot(Number(p.userId)),
+          isTrainer: profile?.isTrainer ?? false,
           isGuest: p.guestId != null,
           addedByUserId: Number(p.addedByUserId),
           addedByName: nameOf(Number(p.addedByUserId)),
@@ -1140,6 +1141,7 @@ export class ParticipationService {
           gender: profile?.gender ?? null,
           isAdmin: profile?.isAdmin ?? false,
           isRoot: this.access.isRoot(Number(w.userId)),
+          isTrainer: profile?.isTrainer ?? false,
           isSelf: w.userId === actor,
           createdAt: w.createdAt.toISOString(),
         };

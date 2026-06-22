@@ -8,6 +8,8 @@ interface Props {
   isUser: boolean;
   // The root super-admin (ADMIN_ID): shown with a plain snowflake glyph.
   isRoot?: boolean;
+  // Trainer (can create GROUP events).
+  isTrainer?: boolean;
   // Owns an active subscription: adds a star, may combine (e.g. 👑⭐).
   isSubscriber?: boolean;
 }
@@ -18,6 +20,7 @@ export function PersonName({
   isAdmin,
   isUser,
   isRoot = false,
+  isTrainer = false,
   isSubscriber = false,
 }: Props): JSX.Element {
   const genderClass =
@@ -26,13 +29,15 @@ export function PersonName({
       : gender === GENDER.MALE
         ? ' person--male'
         : '';
-  // Single badge by priority: root ❄️ > admin 👑 > active subscriber ⭐ > member 👤.
+  // Single badge by priority: root ❄️ > admin 👑 > trainer 🥋 > active subscriber ⭐ > member 👤.
   // U+FE0E forces text (non-emoji) presentation of the snowflake.
   let badge = '';
   if (isRoot) {
     badge = '\u2744\uFE0E';
   } else if (isAdmin) {
     badge = '👑';
+  } else if (isTrainer) {
+    badge = '🥋';
   } else if (isSubscriber) {
     badge = '⭐';
   } else if (isUser) {

@@ -102,6 +102,7 @@ export class SubscriptionsController {
         gender: profile?.gender ?? null,
         isAdmin: profile?.isAdmin ?? false,
         isRoot: this.access.isRoot(userId),
+        isTrainer: profile?.isTrainer ?? false,
         isSubscriber: activeUserIds.has(userId),
         startsAt: r.startsAt.toISOString(),
         endsAt: r.endsAt.toISOString(),

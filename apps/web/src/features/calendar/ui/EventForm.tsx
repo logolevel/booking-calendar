@@ -54,6 +54,7 @@ function addHours(value: string, hours: number): string {
 interface Props {
   event?: EventDto;
   isAdmin: boolean;
+  isTrainer?: boolean;
   // ISO strings used to prefill a new event created from a calendar slot.
   initialStart?: string;
   initialEnd?: string;
@@ -69,6 +70,7 @@ interface Props {
 export function EventForm({
   event,
   isAdmin,
+  isTrainer = false,
   initialStart,
   initialEnd,
   subPrimeStart,
@@ -105,9 +107,13 @@ export function EventForm({
     ? Math.max(MIN_CAPACITY, event?.participantCount ?? MIN_CAPACITY)
     : MIN_CAPACITY;
   const capacityOptions = CAPACITY_OPTIONS.filter((n) => n >= minCapacity);
-  // The group type is admin-only, but keep it available when editing one.
+  // GROUP type is available to admins and trainers; keep it when editing one.
   const typeOptions = Object.values(EVENT_TYPE).filter(
-    (t) => t !== EVENT_TYPE.GROUP || isAdmin || event?.type === EVENT_TYPE.GROUP,
+    (t) =>
+      t !== EVENT_TYPE.GROUP ||
+      isAdmin ||
+      isTrainer ||
+      event?.type === EVENT_TYPE.GROUP,
   );
   const [startsAt, setStartsAt] = useState<string>(
     event
@@ -304,7 +310,7 @@ export function EventForm({
       {isGroup ? (
         <>
           <label className="field">
-            <span className="field__label">Ім'я організатора групи</span>
+            <span className="field__label">Ім'я організатора групи/тренера</span>
             <input
               type="text"
               value={organizerName}

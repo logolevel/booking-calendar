@@ -15,6 +15,7 @@ import type {
   AdminListResponse,
   AdminNotificationSettingsResponse,
   AdminSettingsResponse,
+  TrainerListResponse,
 } from '@tg-calendar/shared-types';
 import { TelegramAuthGuard } from '../../auth/telegram-auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
@@ -25,6 +26,7 @@ import { TelegramService } from '../telegram/telegram.service';
 import { UsersService } from '../users/users.service';
 import { NotificationPrefsService } from '../notifications/notification-prefs.service';
 import { GrantAdminDto } from './dto/grant-admin.dto';
+import { GrantTrainerDto } from './dto/grant-trainer.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
@@ -83,6 +85,60 @@ export class AdminController {
       'ℹ️ Ваші права адміністратора скасовано.',
     );
     return this.adminList(user.id);
+  }
+
+  @Get('trainers')
+  async listTrainers(
+    @CurrentUser() user: VerifiedTelegramUser,
+  ): Promise<TrainerListResponse> {
+    await this.assertAdmin(user.id);
+    return this.trainerList(user.id);
+  }
+
+  @Post('trainers')
+  async grantTrainer(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Body() dto: GrantTrainerDto,
+  ): Promise<TrainerListResponse> {
+    await this.assertAdmin(user.id);
+    await this.access.grantTrainer(dto.userId);
+    await this.telegram.notifyUser(
+      dto.userId,
+      '🥋 Вам надано права тренера.',
+    );
+    return this.trainerList(user.id);
+  }
+
+  @Delete('trainers/:userId')
+  async revokeTrainer(
+    @CurrentUser() user: VerifiedTelegramUser,
+    @Param('userId') userId: string,
+  ): Promise<TrainerListResponse> {
+    await this.assertAdmin(user.id);
+    const targetId = Number(userId);
+    if (!Number.isFinite(targetId)) {
+      throw new BadRequestException('Invalid user id');
+    }
+    await this.access.revokeTrainer(targetId);
+    await this.telegram.notifyUser(
+      targetId,
+      'ℹ️ Ваші права тренера скасовано.',
+    );
+    return this.trainerList(user.id);
+  }
+
+  private async trainerList(viewerId: number): Promise<TrainerListResponse> {
+    const ids = await this.access.listTrainerIds();
+    const rows = await this.users.listByIds(ids);
+    return {
+      trainers: rows.map((r) => ({
+        userId: r.userId,
+        name: r.name,
+        username: r.username,
+        gender: r.gender,
+        isSelf: r.userId === viewerId,
+      })),
+    };
   }
 
   private async adminList(viewerId: number): Promise<AdminListResponse> {

@@ -187,6 +187,42 @@ export class AccessService {
     this.membershipCache.delete(targetId);
   }
 
+  async isTrainerUser(userId: number): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: BigInt(userId) },
+      select: { isTrainer: true },
+    });
+    return user?.isTrainer ?? false;
+  }
+
+  async listTrainerIds(): Promise<number[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { isTrainer: true },
+      select: { id: true },
+    });
+    return rows.map((r) => Number(r.id));
+  }
+
+  async grantTrainer(targetId: number): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: BigInt(targetId) },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    await this.prisma.user.update({
+      where: { id: BigInt(targetId) },
+      data: { isTrainer: true },
+    });
+  }
+
+  async revokeTrainer(targetId: number): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: { id: BigInt(targetId) },
+      data: { isTrainer: false },
+    });
+  }
+
   private async isGroupMember(userId: number): Promise<boolean> {
     const cached = this.membershipCache.get(userId);
     if (cached && cached.expiresAt > Date.now()) {

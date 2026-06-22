@@ -111,6 +111,7 @@ export class EventsService {
     userId: number,
     role: Role,
     dto: CreateEventDto,
+    isTrainer = false,
   ): Promise<EventDto> {
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
@@ -126,9 +127,9 @@ export class EventsService {
 
     const isAdmin = role === Role.admin;
     const isGroup = dto.type === EVENT_TYPE.GROUP;
-    if (isGroup && !isAdmin) {
+    if (isGroup && !isAdmin && !isTrainer) {
       throw new ForbiddenException(
-        'Групове бронювання може створити лише адміністратор.',
+        'Групове бронювання може створити лише адміністратор або тренер.',
       );
     }
 
