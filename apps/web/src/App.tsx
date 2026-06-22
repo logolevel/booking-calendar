@@ -162,6 +162,7 @@ export function App(): JSX.Element {
           primeMemberOpenHour={me.primeMemberOpenHour}
           isSubscriber={me.isSubscriber}
           isTrainer={me.isTrainer}
+          currentUserName={[me.lastName, me.firstName].filter(Boolean).join(' ')}
           initialEventId={initialEventId}
         />
       </main>

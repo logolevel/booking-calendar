@@ -55,6 +55,9 @@ interface Props {
   event?: EventDto;
   isAdmin: boolean;
   isTrainer?: boolean;
+  // Display name ("Прізвище Ім'я") of the current user; used for the
+  // "Я тренер" auto-fill of the organizer field.
+  currentUserName?: string;
   // ISO strings used to prefill a new event created from a calendar slot.
   initialStart?: string;
   initialEnd?: string;
@@ -71,6 +74,7 @@ export function EventForm({
   event,
   isAdmin,
   isTrainer = false,
+  currentUserName = '',
   initialStart,
   initialEnd,
   subPrimeStart,
@@ -98,6 +102,8 @@ export function EventForm({
   );
   // Admin only: create an event without joining it (empty event for others).
   const [skipSelf, setSkipSelf] = useState<boolean>(false);
+  // Trainer convenience: auto-fill organizer name from the current user.
+  const [iAmTrainer, setIAmTrainer] = useState<boolean>(false);
 
   const isGroup = type === EVENT_TYPE.GROUP;
   // A non-admin author may edit only the capacity; everything else is locked.
@@ -235,12 +241,14 @@ export function EventForm({
           ? serverError ?? 'Не вдалося зберегти подію. Спробуйте ще раз.'
           : null;
 
+  const effectiveOrganizerName = iAmTrainer ? currentUserName : organizerName;
   const canSubmit =
     Boolean(startsAt) &&
     Boolean(endsAt) &&
     !primeBlocked &&
     !quotaBlocked &&
-    (!isGroup || organizerName.trim().length > 0);
+    (!isGroup || effectiveOrganizerName.trim().length > 0) &&
+    (!isGroup || groupSize.trim().length > 0);
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
@@ -253,7 +261,7 @@ export function EventForm({
       // Group bookings have no sign-up list; capacity is irrelevant.
       capacity: isGroup ? MIN_CAPACITY : capacity,
       title: event?.title ?? undefined,
-      organizerName: isGroup ? organizerName.trim() : undefined,
+      organizerName: isGroup ? effectiveOrganizerName.trim() : undefined,
       organizerPhone:
         isGroup && organizerPhone.trim() ? organizerPhone.trim() : undefined,
       groupSize:
@@ -313,12 +321,25 @@ export function EventForm({
             <span className="field__label">Ім'я організатора групи/тренера</span>
             <input
               type="text"
-              value={organizerName}
+              value={iAmTrainer ? currentUserName : organizerName}
+              disabled={iAmTrainer}
               onChange={(e) => {
                 clearError();
                 setOrganizerName(e.target.value);
               }}
             />
+          </label>
+
+          <label className="participants__checkbox field">
+            <input
+              type="checkbox"
+              checked={iAmTrainer}
+              onChange={(e) => {
+                setIAmTrainer(e.target.checked);
+                clearError();
+              }}
+            />
+            Я тренер
           </label>
 
           <label className="field">
@@ -335,7 +356,7 @@ export function EventForm({
           </label>
 
           <label className="field">
-            <span className="field__label">Кількість людей (необов'язково)</span>
+            <span className="field__label">Кількість людей</span>
             <input
               type="text"
               inputMode="numeric"

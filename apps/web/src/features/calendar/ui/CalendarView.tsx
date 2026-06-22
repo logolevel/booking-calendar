@@ -152,6 +152,8 @@ interface Props {
   primeMemberOpenHour: number;
   isSubscriber: boolean;
   isTrainer?: boolean;
+  // Display name of the current user for the GROUP organizer auto-fill.
+  currentUserName?: string;
   // Event id from a Telegram deep link; opens its roster on first load.
   initialEventId?: string | null;
 }
@@ -167,6 +169,7 @@ export function CalendarView({
   primeMemberOpenHour,
   isSubscriber,
   isTrainer = false,
+  currentUserName = '',
   initialEventId,
 }: Props): JSX.Element {
   const { data, isLoading, isError } = useEvents();
@@ -448,6 +451,7 @@ export function CalendarView({
               event={activeEvent ?? undefined}
               isAdmin={isAdmin}
               isTrainer={isTrainer}
+              currentUserName={currentUserName}
               initialStart={draft ? draft.start.toISOString() : undefined}
               initialEnd={draft ? draft.end.toISOString() : undefined}
               subPrimeStart={subPrimeStart}
