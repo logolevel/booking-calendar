@@ -192,6 +192,8 @@ export function ParticipantsPanel({
   const search = useUserSearch(query);
 
   const isGroup = event.type === EVENT_TYPE.GROUP;
+  const isChildren = event.type === EVENT_TYPE.CHILDREN;
+  const isOrganizerType = isGroup || isChildren;
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
   // A finished event is read-only: only viewing, no joins/edits/deletes.
@@ -371,15 +373,20 @@ export function ParticipantsPanel({
         <p className="participants__readonly">Подію завершено · лише перегляд</p>
       )}
 
-      {isGroup && (
+      {isOrganizerType && (
         <div className="participants__organizer">
           <div className="participants__subtitle">Організатор</div>
           <div className="participants__organizer-name">
             {event.organizerName ?? '—'}
           </div>
-          {event.groupSize != null && (
+          {isGroup && event.groupSize != null && (
             <div className="participants__time">
               Кількість людей (без абонемента): {event.groupSize}
+            </div>
+          )}
+          {isChildren && event.adultsCount != null && (
+            <div className="participants__time">
+              Кількість людей 18+: {event.adultsCount}
             </div>
           )}
           {event.organizerPhone && (
@@ -393,17 +400,17 @@ export function ParticipantsPanel({
         </div>
       )}
 
-      {!isGroup && (
+      {!isOrganizerType && (
         <div className="participants__count">
           Учасники {data ? `${data.count}/${data.capacity}` : '…'}
         </div>
       )}
 
-      {!isGroup && isLoading && (
+      {!isOrganizerType && isLoading && (
         <p className="state__text">Завантаження…</p>
       )}
 
-      {!isGroup && data && (
+      {!isOrganizerType && data && (
         <>
           <ul className="participants__list">
             {pairGroups.map((g) =>

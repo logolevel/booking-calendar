@@ -8,6 +8,7 @@ const LABELS: Record<EventType, string> = {
   [EVENT_TYPE.TECH_WOMEN]: 'Жінки (технічка)',
   [EVENT_TYPE.TECH_MEN]: 'Чоловіки (технічка)',
   [EVENT_TYPE.GROUP]: 'Група',
+  [EVENT_TYPE.CHILDREN]: 'Діти',
 };
 
 export function eventTypeLabel(type: EventType): string {

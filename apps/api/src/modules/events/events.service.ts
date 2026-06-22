@@ -40,6 +40,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   tech_women: 'Жінки (технічка)',
   tech_men: 'Чоловіки (технічка)',
   group: 'Група',
+  children: 'Діти',
 };
 
 const COURT_LABELS: Record<number, string> = { 1: 'Зелений', 2: 'Червоний' };
@@ -53,6 +54,7 @@ interface EventComparable {
   organizerName: string | null;
   organizerPhone: string | null;
   groupSize: number | null;
+  adultsCount: number | null;
   startsAt: Date;
   endsAt: Date;
 }
@@ -66,6 +68,7 @@ interface EventRow {
   organizerName: string | null;
   organizerPhone: string | null;
   groupSize: number | null;
+  adultsCount: number | null;
   startsAt: Date;
   endsAt: Date;
   createdBy: bigint;
@@ -126,7 +129,10 @@ export class EventsService {
 
     const isAdmin = role === Role.admin;
     const isGroup = dto.type === EVENT_TYPE.GROUP;
-    if (isGroup && !isAdmin && !isTrainer) {
+    const isChildren = dto.type === EVENT_TYPE.CHILDREN;
+    // Both GROUP and CHILDREN are organizer-led booking types: no sign-up list.
+    const isOrganizerType = isGroup || isChildren;
+    if (isOrganizerType && !isAdmin && !isTrainer) {
       throw new ForbiddenException(
         'Групове бронювання може створити лише адміністратор або тренер.',
       );
@@ -138,7 +144,7 @@ export class EventsService {
 
     // Only an admin may create an event they do not join (empty event). Such
     // admin events are allowed to stay empty; member events are not.
-    const joinSelf = !isGroup && !(isAdmin && dto.skipSelf);
+    const joinSelf = !isOrganizerType && !(isAdmin && dto.skipSelf);
 
     // Create the event and the creator's own participation in one transaction:
     // the prime-time gate and weekly quota apply to the auto-join exactly as
@@ -153,9 +159,10 @@ export class EventsService {
             title: dto.title ?? null,
             capacity: dto.capacity,
             allowEmpty: isAdmin,
-            organizerName: isGroup ? dto.organizerName ?? null : null,
-            organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+            organizerName: isOrganizerType ? dto.organizerName ?? null : null,
+            organizerPhone: isOrganizerType ? dto.organizerPhone ?? null : null,
             groupSize: isGroup ? dto.groupSize ?? null : null,
+            adultsCount: isChildren ? dto.adultsCount ?? null : null,
             startsAt,
             endsAt,
             createdBy: BigInt(userId),
@@ -246,14 +253,17 @@ export class EventsService {
     }
 
     const isGroup = dto.type === EVENT_TYPE.GROUP;
+    const isChildren = dto.type === EVENT_TYPE.CHILDREN;
+    const isOrganizerType = isGroup || isChildren;
     const next: EventComparable = {
       type: dto.type,
       resourceId: dto.resourceId,
       title: dto.title ?? null,
       capacity: dto.capacity,
-      organizerName: isGroup ? dto.organizerName ?? null : null,
-      organizerPhone: isGroup ? dto.organizerPhone ?? null : null,
+      organizerName: isOrganizerType ? dto.organizerName ?? null : null,
+      organizerPhone: isOrganizerType ? dto.organizerPhone ?? null : null,
       groupSize: isGroup ? dto.groupSize ?? null : null,
+      adultsCount: isChildren ? dto.adultsCount ?? null : null,
       startsAt,
       endsAt,
     };
@@ -271,6 +281,7 @@ export class EventsService {
             organizerName: next.organizerName,
             organizerPhone: next.organizerPhone,
             groupSize: next.groupSize,
+            adultsCount: next.adultsCount,
             startsAt,
             endsAt,
           },
@@ -339,7 +350,12 @@ export class EventsService {
     }
     if ((before.groupSize ?? null) !== (after.groupSize ?? null)) {
       changes.push(
-        `кількість: ${before.groupSize ?? '—'} → ${after.groupSize ?? '—'}`,
+        `кількість (без абонемента): ${before.groupSize ?? '—'} → ${after.groupSize ?? '—'}`,
+      );
+    }
+    if ((before.adultsCount ?? null) !== (after.adultsCount ?? null)) {
+      changes.push(
+        `кількість 18+: ${before.adultsCount ?? '—'} → ${after.adultsCount ?? '—'}`,
       );
     }
     return changes;
@@ -566,6 +582,7 @@ export class EventsService {
       organizerName: event.organizerName,
       organizerPhone: event.organizerPhone,
       groupSize: event.groupSize,
+      adultsCount: event.adultsCount,
       startsAt: event.startsAt.toISOString(),
       endsAt: event.endsAt.toISOString(),
       createdBy: Number(event.createdBy),

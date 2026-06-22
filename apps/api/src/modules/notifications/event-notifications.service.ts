@@ -48,6 +48,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   tech_women: 'Жінки (технічка)',
   tech_men: 'Чоловіки (технічка)',
   group: 'Група',
+  children: 'Діти',
 };
 
 const COURT_LABELS: Record<number, string> = {

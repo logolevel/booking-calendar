@@ -20,6 +20,7 @@ enum EventType {
   tech_women
   tech_men
   group
+  children
 }
 
 enum Gender {
@@ -94,10 +95,12 @@ model Event {
   capacity       Int                     @default(6)
   // Admin-created events may stay empty; member events auto-delete when empty.
   allowEmpty     Boolean                 @default(false)
-  // Set only for `group` events: organizer contact details and head count.
+  // group events: organizer contact details and non-subscriber head count.
+  // children events: organizer contact details and adults (18+) head count.
   organizerName  String?
   organizerPhone String?
   groupSize      Int?
+  adultsCount    Int?
   startsAt       DateTime
   endsAt         DateTime
   createdBy      BigInt

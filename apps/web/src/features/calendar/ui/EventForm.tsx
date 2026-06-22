@@ -100,12 +100,17 @@ export function EventForm({
   const [groupSize, setGroupSize] = useState<string>(
     event?.groupSize != null ? String(event.groupSize) : '',
   );
+  const [adultsCount, setAdultsCount] = useState<string>(
+    event?.adultsCount != null ? String(event.adultsCount) : '',
+  );
   // Admin only: create an event without joining it (empty event for others).
   const [skipSelf, setSkipSelf] = useState<boolean>(false);
   // Trainer convenience: auto-fill organizer name from the current user.
   const [iAmTrainer, setIAmTrainer] = useState<boolean>(false);
 
   const isGroup = type === EVENT_TYPE.GROUP;
+  const isChildren = type === EVENT_TYPE.CHILDREN;
+  const isOrganizerType = isGroup || isChildren;
   // A non-admin author may edit only the capacity; everything else is locked.
   const limitOnly = isEdit && !isAdmin;
   // An author may only raise the limit, never below who is already in.
@@ -113,14 +118,16 @@ export function EventForm({
     ? Math.max(MIN_CAPACITY, event?.participantCount ?? MIN_CAPACITY)
     : MIN_CAPACITY;
   const capacityOptions = CAPACITY_OPTIONS.filter((n) => n >= minCapacity);
-  // GROUP type is available to admins and trainers; keep it when editing one.
-  const typeOptions = Object.values(EVENT_TYPE).filter(
-    (t) =>
-      t !== EVENT_TYPE.GROUP ||
-      isAdmin ||
-      isTrainer ||
-      event?.type === EVENT_TYPE.GROUP,
-  );
+  // GROUP and CHILDREN types are available to admins and trainers; keep when editing.
+  const typeOptions = Object.values(EVENT_TYPE).filter((t) => {
+    if (t === EVENT_TYPE.GROUP) {
+      return isAdmin || isTrainer || event?.type === EVENT_TYPE.GROUP;
+    }
+    if (t === EVENT_TYPE.CHILDREN) {
+      return isAdmin || isTrainer || event?.type === EVENT_TYPE.CHILDREN;
+    }
+    return true;
+  });
   const [startsAt, setStartsAt] = useState<string>(
     event
       ? toLocalInput(event.startsAt)
@@ -203,7 +210,7 @@ export function EventForm({
   // sees their "N/2" status and learns up front why a slot may be unavailable.
   const validStart = start != null && !Number.isNaN(start.getTime());
   const validEnd = end != null && !Number.isNaN(end.getTime());
-  const quotaRelevant = !isEdit && !isGroup && !(isAdmin && skipSelf);
+  const quotaRelevant = !isEdit && !isOrganizerType && !(isAdmin && skipSelf);
   const startIso = validStart ? start.toISOString() : null;
   const endIso = validEnd ? end.toISOString() : null;
   const { data: quota } = usePrimeQuota(
@@ -254,9 +261,10 @@ export function EventForm({
     Boolean(endsAt) &&
     !primeBlocked &&
     !quotaBlocked &&
-    (!isGroup || effectiveOrganizerName.trim().length > 0) &&
+    (!isOrganizerType || effectiveOrganizerName.trim().length > 0) &&
     (!isGroup || groupSize.trim().length > 0) &&
-    (!isGroup || !phoneInvalid);
+    (!isChildren || adultsCount.trim().length > 0) &&
+    (!isOrganizerType || !phoneInvalid);
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
@@ -266,15 +274,18 @@ export function EventForm({
     const body = {
       type,
       resourceId,
-      // Group bookings have no sign-up list; capacity is irrelevant.
-      capacity: isGroup ? MIN_CAPACITY : capacity,
+      // Organizer-type bookings have no sign-up list; capacity is irrelevant.
+      capacity: isOrganizerType ? MIN_CAPACITY : capacity,
       title: event?.title ?? undefined,
-      organizerName: isGroup ? effectiveOrganizerName.trim() : undefined,
+      organizerName: isOrganizerType ? effectiveOrganizerName.trim() : undefined,
       organizerPhone:
-        isGroup && organizerPhone.trim() ? organizerPhone.trim() : undefined,
-      groupSize:
-        isGroup && groupSize.trim() ? Number(groupSize) : undefined,
-      skipSelf: isAdmin && !isGroup && !isEdit ? skipSelf : undefined,
+        isOrganizerType && organizerPhone.trim()
+          ? organizerPhone.trim()
+          : undefined,
+      groupSize: isGroup && groupSize.trim() ? Number(groupSize) : undefined,
+      adultsCount:
+        isChildren && adultsCount.trim() ? Number(adultsCount) : undefined,
+      skipSelf: isAdmin && !isOrganizerType && !isEdit ? skipSelf : undefined,
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
     };
@@ -323,7 +334,7 @@ export function EventForm({
         </select>
       </label>
 
-      {isGroup ? (
+      {isOrganizerType ? (
         <>
           <label className="field">
             <span className="field__label">Ім'я організатора групи/тренера</span>
@@ -370,18 +381,37 @@ export function EventForm({
             )}
           </label>
 
-          <label className="field">
-            <span className="field__label">Кількість людей (у яких нема абонемента)</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={groupSize}
-              onChange={(e) => {
-                clearError();
-                setGroupSize(e.target.value.replace(/\D/g, '').slice(0, 3));
-              }}
-            />
-          </label>
+          {isGroup && (
+            <label className="field">
+              <span className="field__label">
+                Кількість людей (у яких нема абонемента)
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={groupSize}
+                onChange={(e) => {
+                  clearError();
+                  setGroupSize(e.target.value.replace(/\D/g, '').slice(0, 3));
+                }}
+              />
+            </label>
+          )}
+
+          {isChildren && (
+            <label className="field">
+              <span className="field__label">Кількість людей 18+</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={adultsCount}
+                onChange={(e) => {
+                  clearError();
+                  setAdultsCount(e.target.value.replace(/\D/g, '').slice(0, 3));
+                }}
+              />
+            </label>
+          )}
         </>
       ) : (
         <label className="field">
@@ -438,7 +468,7 @@ export function EventForm({
         </div>
       )}
 
-      {isAdmin && !isGroup && !isEdit && (
+      {isAdmin && !isOrganizerType && !isEdit && (
         <label className="participants__checkbox field">
           <input
             type="checkbox"

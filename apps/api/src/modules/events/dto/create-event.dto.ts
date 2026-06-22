@@ -61,6 +61,13 @@ export class CreateEventDto {
   @Max(100)
   groupSize?: number;
 
+  // Children events only: adults (18+) head count for billing.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  adultsCount?: number;
+
   // Admin only: skip auto-joining the creator.
   @IsOptional()
   @IsBoolean()

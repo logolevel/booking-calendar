@@ -21,6 +21,8 @@ export const EVENT_TYPE = {
   TECH_MEN: 'tech_men',
   // Outside group booking (admin-only): no sign-up list, just an organizer.
   GROUP: 'group',
+  // Children's training (admin-only): uses adultsCount instead of groupSize.
+  CHILDREN: 'children',
 } as const;
 
 export type EventType = (typeof EVENT_TYPE)[keyof typeof EVENT_TYPE];
@@ -242,10 +244,13 @@ export interface EventDto {
   capacity: number;
   // Current number of participants (used for the calendar fill indicator).
   participantCount: number;
-  // Group events only: organizer name, optional contact phone and head count.
+  // Group/children events only: organizer name and optional contact phone.
   organizerName: string | null;
   organizerPhone: string | null;
+  // Group events only: non-subscriber head count.
   groupSize: number | null;
+  // Children events only: adults (18+) head count for billing.
+  adultsCount: number | null;
   startsAt: string;
   endsAt: string;
   createdBy: number;
@@ -270,7 +275,10 @@ export interface CreateEventRequest {
   capacity: number;
   organizerName?: string;
   organizerPhone?: string;
+  // Group events only: non-subscriber head count.
   groupSize?: number;
+  // Children events only: adults (18+) head count for billing.
+  adultsCount?: number;
   // Admin only: create the event without joining it themselves.
   skipSelf?: boolean;
   startsAt: string;
