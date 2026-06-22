@@ -261,10 +261,10 @@ export function EventForm({
     Boolean(endsAt) &&
     !primeBlocked &&
     !quotaBlocked &&
-    (!isOrganizerType || effectiveOrganizerName.trim().length > 0) &&
+    (!isGroup || effectiveOrganizerName.trim().length > 0) &&
     (!isGroup || groupSize.trim().length > 0) &&
-    (!isChildren || adultsCount.trim().length > 0) &&
-    (!isOrganizerType || !phoneInvalid);
+    (!isGroup || !phoneInvalid) &&
+    (!isChildren || adultsCount.trim().length > 0);
 
   const submit = (e: FormEvent): void => {
     e.preventDefault();
@@ -277,11 +277,9 @@ export function EventForm({
       // Organizer-type bookings have no sign-up list; capacity is irrelevant.
       capacity: isOrganizerType ? MIN_CAPACITY : capacity,
       title: event?.title ?? undefined,
-      organizerName: isOrganizerType ? effectiveOrganizerName.trim() : undefined,
+      organizerName: isGroup ? effectiveOrganizerName.trim() : undefined,
       organizerPhone:
-        isOrganizerType && organizerPhone.trim()
-          ? organizerPhone.trim()
-          : undefined,
+        isGroup && organizerPhone.trim() ? organizerPhone.trim() : undefined,
       groupSize: isGroup && groupSize.trim() ? Number(groupSize) : undefined,
       adultsCount:
         isChildren && adultsCount.trim() ? Number(adultsCount) : undefined,
@@ -336,71 +334,77 @@ export function EventForm({
 
       {isOrganizerType ? (
         <>
-          <label className="field">
-            <span className="field__label">Ім'я організатора групи/тренера</span>
-            <input
-              type="text"
-              value={iAmTrainer ? currentUserName : organizerName}
-              disabled={iAmTrainer}
-              onChange={(e) => {
-                clearError();
-                setOrganizerName(e.target.value);
-              }}
-            />
-          </label>
-
-          <label className="participants__checkbox field">
-            <input
-              type="checkbox"
-              checked={iAmTrainer}
-              onChange={(e) => {
-                setIAmTrainer(e.target.checked);
-                clearError();
-              }}
-            />
-            Я тренер
-          </label>
-
-          <label className="field">
-            <span className="field__label">Номер телефону (необов'язково)</span>
-            <input
-              type="tel"
-              inputMode="tel"
-              value={organizerPhone}
-              placeholder="+380 XX XXX XX XX"
-              className={phoneInvalid ? 'input--error' : undefined}
-              onChange={(e) => {
-                clearError();
-                setOrganizerPhone(e.target.value);
-              }}
-            />
-            {phoneInvalid && (
-              <span className="field__error">
-                Введіть коректний номер (+380...)
-              </span>
-            )}
-          </label>
-
           {isGroup && (
-            <label className="field">
-              <span className="field__label">
-                Кількість людей (у яких нема абонемента)
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={groupSize}
-                onChange={(e) => {
-                  clearError();
-                  setGroupSize(e.target.value.replace(/\D/g, '').slice(0, 3));
-                }}
-              />
-            </label>
+            <>
+              <label className="field">
+                <span className="field__label">
+                  Ім'я організатора групи/тренера
+                </span>
+                <input
+                  type="text"
+                  value={iAmTrainer ? currentUserName : organizerName}
+                  disabled={iAmTrainer}
+                  onChange={(e) => {
+                    clearError();
+                    setOrganizerName(e.target.value);
+                  }}
+                />
+              </label>
+
+              <label className="participants__checkbox field">
+                <input
+                  type="checkbox"
+                  checked={iAmTrainer}
+                  onChange={(e) => {
+                    setIAmTrainer(e.target.checked);
+                    clearError();
+                  }}
+                />
+                Я тренер
+              </label>
+
+              <label className="field">
+                <span className="field__label">
+                  Номер телефону (необов'язково)
+                </span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={organizerPhone}
+                  placeholder="+380 XX XXX XX XX"
+                  className={phoneInvalid ? 'input--error' : undefined}
+                  onChange={(e) => {
+                    clearError();
+                    setOrganizerPhone(e.target.value);
+                  }}
+                />
+                {phoneInvalid && (
+                  <span className="field__error">
+                    Введіть коректний номер (+380...)
+                  </span>
+                )}
+              </label>
+
+              <label className="field">
+                <span className="field__label">
+                  Кількість людей (у яких нема абонемента)
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={groupSize}
+                  onChange={(e) => {
+                    clearError();
+                    setGroupSize(e.target.value.replace(/\D/g, '').slice(0, 3));
+                  }}
+                />
+              </label>
+            </>
           )}
 
           {isChildren && (
             <label className="field">
-              <span className="field__label">Кількість людей 18+</span>
+              <span className="field__label">Кількість дітей 18+</span>
               <input
                 type="text"
                 inputMode="numeric"

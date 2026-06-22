@@ -373,20 +373,15 @@ export function ParticipantsPanel({
         <p className="participants__readonly">Подію завершено · лише перегляд</p>
       )}
 
-      {isOrganizerType && (
+      {isGroup && (
         <div className="participants__organizer">
           <div className="participants__subtitle">Організатор</div>
           <div className="participants__organizer-name">
             {event.organizerName ?? '—'}
           </div>
-          {isGroup && event.groupSize != null && (
+          {event.groupSize != null && (
             <div className="participants__time">
               Кількість людей (без абонемента): {event.groupSize}
-            </div>
-          )}
-          {isChildren && event.adultsCount != null && (
-            <div className="participants__time">
-              Кількість людей 18+: {event.adultsCount}
             </div>
           )}
           {event.organizerPhone && (
@@ -397,6 +392,14 @@ export function ParticipantsPanel({
               📞 {event.organizerPhone}
             </a>
           )}
+        </div>
+      )}
+
+      {isChildren && event.adultsCount != null && (
+        <div className="participants__organizer">
+          <div className="participants__time">
+            Кількість дітей 18+: {event.adultsCount}
+          </div>
         </div>
       )}
 
